@@ -80,6 +80,59 @@ class ICalParser:
 
         return event
 
+    def expand_multiday_events(self):
+        """Expand multi-day events into separate daily events"""
+        expanded = []
+        for event in self.events:
+            if not event['start'] or not event['end']:
+                expanded.append(event)
+                continue
+            
+            # Get date-only parts for comparison
+            start_date = event['start'].date()
+            end_date = event['end'].date()
+            
+            # If same day, keep as-is
+            if start_date == end_date:
+                expanded.append(event)
+                continue
+            
+            # Create an event for each day (end_date is exclusive)
+            current_date = start_date
+            while current_date < end_date:  # Changed from <= to 
+                day_event = event.copy()
+                
+                # First day: use original start time
+                if current_date == start_date:
+                    day_event['start'] = event['start']
+                    # End at midnight of next day
+                    next_midnight = datetime.combine(current_date + timedelta(days=1), 
+                                                    datetime.min.time())
+                    if event['start'].tzinfo:
+                        next_midnight = next_midnight.replace(tzinfo=event['start'].tzinfo)
+                    day_event['end'] = next_midnight
+                # Last day: start at midnight, use original end time
+                elif current_date == end_date - timedelta(days=1):
+                    day_start = datetime.combine(current_date, datetime.min.time())
+                    if event['start'].tzinfo:
+                        day_start = day_start.replace(tzinfo=event['start'].tzinfo)
+                    day_event['start'] = day_start
+                    day_event['end'] = event['end']
+                # Middle days: full day
+                else:
+                    day_start = datetime.combine(current_date, datetime.min.time())
+                    day_end = datetime.combine(current_date + timedelta(days=1), datetime.min.time())
+                    if event['start'].tzinfo:
+                        day_start = day_start.replace(tzinfo=event['start'].tzinfo)
+                        day_end = day_end.replace(tzinfo=event['start'].tzinfo)
+                    day_event['start'] = day_start
+                    day_event['end'] = day_end
+                
+                expanded.append(day_event)
+                current_date += timedelta(days=1)
+        
+        self.events = expanded
+
     def fetch_from_url(self, url: str) -> str:
         """Fetch iCal content from a URL or from cache"""
         cached = self.cache.get(url)
@@ -126,3 +179,4 @@ class ICalParser:
     def load_sources(self, sources):
         for src in sources:
             self.parse_file(src)
+            self.expand_multiday_events()
