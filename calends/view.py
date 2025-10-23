@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from .colors import Colors
 
+
 class WeeklyView:
     """Display events in a weekly terminal view."""
 
@@ -21,23 +22,36 @@ class WeeklyView:
     def filter_events_for_week(self):
         week_events = defaultdict(list)
         for e in self.events:
-            if e['start'] and self.start_date <= e['start'] < self.end_date:
-                week_events[e['start'].date()].append(e)
+            if e["start"] and self.start_date <= e["start"] < self.end_date:
+                week_events[e["start"].date()].append(e)
         for day in week_events:
-            week_events[day].sort(key=lambda ev: ev['start'])
+            week_events[day].sort(key=lambda ev: ev["start"])
         return week_events
 
-    def format_time(self, dt): return dt.strftime('%H:%M')
-    def truncate(self, text, n): return text if len(text)<=n else text[:n-3]+'...'
+    def format_time(self, dt):
+        return dt.strftime("%H:%M")
+
+    def truncate(self, text, n):
+        return text if len(text) <= n else text[: n - 3] + "..."
 
     def display(self):
         week = self.filter_events_for_week()
         now = datetime.now(self.target_timezone)
         week_number = now.isocalendar().week
         print(f"\n{Colors.BOLD}{'='*80}{Colors.RESET}")
-        print(f"{Colors.BOLD}{Colors.CYAN}Week {week_number}, {self.start_date.strftime('%B %Y')}{Colors.RESET}")
+        print(
+            f"{Colors.BOLD}{Colors.CYAN}Week {week_number}, {self.start_date.strftime('%B %Y')}{Colors.RESET}"
+        )
         print(f"{Colors.BOLD}{'='*80}{Colors.RESET}\n")
-        days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+        days = [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        ]
         for i, dname in enumerate(days):
             current = self.start_date + timedelta(days=i)
             key = current.date()
@@ -49,12 +63,14 @@ class WeeklyView:
             print(f"{Colors.DIM}{'-'*80}{Colors.RESET}")
             if key in week:
                 for e in week[key]:
-                    start, end = self.format_time(e['start']), self.format_time(e['end'])
+                    start, end = self.format_time(e["start"]), self.format_time(
+                        e["end"]
+                    )
                     time_range = f"{start} - {end}" if start != end else "All day"
-                    
+
                     # Check if event is currently ongoing
-                    is_ongoing = e['start'] <= now < e['end']
-                    
+                    is_ongoing = e["start"] <= now < e["end"]
+
                     # Set background and text color
                     if is_ongoing:
                         bg_color = Colors.BG_RED
@@ -63,18 +79,26 @@ class WeeklyView:
                         line = f"  {time_range:<15}{e['summary']}"
                         line = line.ljust(80)
                         print(f"{bg_color}{text_color}{line}{Colors.RESET}")
-                        if e['location']:
+                        if e["location"]:
                             loc_line = f"                   ⚲ {self.truncate(e['location'],60)}"
                             loc_line = loc_line.ljust(80)
                             print(f"{bg_color}{Colors.CYAN}{loc_line}{Colors.RESET}")
-                    elif e['end'] < now:
-                        print(f"{Colors.DIM}  {time_range:<15}{Colors.RESET}{e['summary']}{Colors.RESET}")
-                        if e['location']:
-                            print(f"{Colors.CYAN}                   ⚲ {self.truncate(e['location'],60)}{Colors.RESET}")
+                    elif e["end"] < now:
+                        print(
+                            f"{Colors.DIM}  {time_range:<15}{Colors.RESET}{e['summary']}{Colors.RESET}"
+                        )
+                        if e["location"]:
+                            print(
+                                f"{Colors.CYAN}                   ⚲ {self.truncate(e['location'],60)}{Colors.RESET}"
+                            )
                     else:
-                        print(f"{Colors.BLUE}  {time_range:<15}{Colors.RESET}{e['summary']}{Colors.RESET}")
-                        if e['location']:
-                            print(f"{Colors.CYAN}                   ⚲ {self.truncate(e['location'],60)}{Colors.RESET}")
+                        print(
+                            f"{Colors.BLUE}  {time_range:<15}{Colors.RESET}{e['summary']}{Colors.RESET}"
+                        )
+                        if e["location"]:
+                            print(
+                                f"{Colors.CYAN}                   ⚲ {self.truncate(e['location'],60)}{Colors.RESET}"
+                            )
             else:
                 print(f"{Colors.DIM}  No events{Colors.RESET}")
         total = sum(len(v) for v in week.values())

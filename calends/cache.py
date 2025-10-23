@@ -3,9 +3,10 @@ import pickle
 import time
 from datetime import datetime
 
+
 class Cache:
     """Simple pickle-based cache with expiration."""
-    
+
     def __init__(self, path=".calends.pkl", expiration_seconds=60):
         self.path = path
         self.expiration = expiration_seconds

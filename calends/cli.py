@@ -6,13 +6,14 @@ from .parser import ICalParser
 from .view import WeeklyView
 from .config import find_default_config, load_config, parse_timezone
 
+
 def main():
     parser = argparse.ArgumentParser(description="Terminal iCal Weekly Viewer")
-    parser.add_argument('sources', nargs='*', help='One or more .ics URLs or paths')
-    parser.add_argument('-c', '--config', help='Path to JSON config file')
-    parser.add_argument('-d', '--date', help='Start date (YYYY-MM-DD)')
-    parser.add_argument('-tz','--timezone', help='Timezone (e.g. +0530, UTC, local)')
-    parser.add_argument('--no-color', action='store_true', help='Disable colors')
+    parser.add_argument("sources", nargs="*", help="One or more .ics URLs or paths")
+    parser.add_argument("-c", "--config", help="Path to JSON config file")
+    parser.add_argument("-d", "--date", help="Start date (YYYY-MM-DD)")
+    parser.add_argument("-tz", "--timezone", help="Timezone (e.g. +0530, UTC, local)")
+    parser.add_argument("--no-color", action="store_true", help="Disable colors")
     args = parser.parse_args()
 
     if args.no_color or not sys.stdout.isatty():
@@ -21,7 +22,7 @@ def main():
     start = None
     if args.date:
         try:
-            start = datetime.strptime(args.date, '%Y-%m-%d')
+            start = datetime.strptime(args.date, "%Y-%m-%d")
             start -= timedelta(days=start.weekday())
             start = start.replace(hour=0, minute=0)
         except ValueError:
