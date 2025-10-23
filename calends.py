@@ -16,6 +16,43 @@ from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 
 
+# ANSI color codes
+class Colors:
+    """ANSI color codes for terminal output."""
+    RESET = '\033[0m'
+    BOLD = '\033[1m'
+    DIM = '\033[2m'
+    
+    # Regular colors
+    GREY = '\033[90m'
+    RED = '\033[91m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    BLUE = '\033[94m'
+    MAGENTA = '\033[95m'
+    CYAN = '\033[96m'
+    WHITE = '\033[97m'
+    
+    # Light colors for past events
+    LIGHT_GREY = '\033[37m'
+    
+    @staticmethod
+    def disable():
+        """Disable colors (for piping or when colors not supported)."""
+        Colors.RESET = ''
+        Colors.BOLD = ''
+        Colors.DIM = ''
+        Colors.GREY = ''
+        Colors.RED = ''
+        Colors.GREEN = ''
+        Colors.YELLOW = ''
+        Colors.BLUE = ''
+        Colors.MAGENTA = ''
+        Colors.CYAN = ''
+        Colors.WHITE = ''
+        Colors.LIGHT_GREY = ''
+
+
 class ICalParser:
     """Parse iCal files without external dependencies."""
     
@@ -109,6 +146,12 @@ class ICalParser:
             elif line.startswith('DESCRIPTION:'):
                 event['description'] = line[12:]
         
+        # If no timezone is specified, assume that it is from the current timezone
+        if event['start'] and not event['start'].tzinfo:
+            event['start'] = event['start'].replace(tzinfo=self.target_timezone)
+        if event['end'] and not event['end'].tzinfo:
+            event['end'] = event['end'].replace(tzinfo=self.target_timezone)
+
         # If end time not specified, default to 1 hour after start
         if event['start'] and not event['end']:
             event['end'] = event['start'] + timedelta(hours=1)
@@ -231,13 +274,18 @@ class WeeklyView:
         return text[:max_len-3] + '...'
     
     def display(self):
-        """Display the weekly view."""
+        """Display the weekly view with colors."""
         week_events = self.filter_events_for_week()
         
+        # Get current time for comparison (with timezone awareness if needed)
+        now = datetime.now()
+        if self.start_date.tzinfo:
+            now = datetime.now(timezone.utc)
+        
         # Print header
-        print("\n" + "="*80)
-        print(f"Week of {self.start_date.strftime('%B %d, %Y')}")
-        print("="*80 + "\n")
+        print(f"\n{Colors.BOLD}{'='*80}{Colors.RESET}")
+        print(f"{Colors.BOLD}{Colors.CYAN}Week of {self.start_date.strftime('%B %d, %Y')}{Colors.RESET}")
+        print(f"{Colors.BOLD}{'='*80}{Colors.RESET}\n")
         
         # Display each day
         days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -246,9 +294,15 @@ class WeeklyView:
             current_date = self.start_date + timedelta(days=i)
             day_key = current_date.date()
             
-            # Day header
-            print(f"\n{day_name}, {current_date.strftime('%B %d')}")
-            print("-" * 80)
+            # Check if this is today
+            is_today = day_key == now.date()
+            
+            # Day header with color
+            if is_today:
+                print(f"\n{Colors.BOLD}{Colors.GREEN}{day_name}, {current_date.strftime('%B %d')} (Today){Colors.RESET}")
+            else:
+                print(f"\n{Colors.BOLD}{day_name}, {current_date.strftime('%B %d')}{Colors.RESET}")
+            print(f"{Colors.DIM}{'-' * 80}{Colors.RESET}")
             
             if day_key in week_events and week_events[day_key]:
                 for event in week_events[day_key]:
@@ -256,24 +310,34 @@ class WeeklyView:
                     end_time = self.format_time(event['end'])
                     summary = self.truncate(event['summary'], 50)
                     
-                    print(f"  {start_time} - {end_time}  {summary}")
+                    # Determine if event is in the past
+                    is_past = event['end'] < now
                     
-                    if event['location']:
-                        location = self.truncate(event['location'], 60)
-                        print(f"                  📍 {location}")
+                    if is_past:
+                        # Past events in light grey
+                        print(f"{Colors.LIGHT_GREY}  {start_time} - {end_time}  {summary}{Colors.RESET}")
+                        if event['location']:
+                            location = self.truncate(event['location'], 60)
+                            print(f"{Colors.LIGHT_GREY}                  📍 {location}{Colors.RESET}")
+                    else:
+                        # Current/future events with colored time
+                        print(f"{Colors.BLUE}  {start_time} - {end_time}{Colors.RESET}  {summary}")
+                        if event['location']:
+                            location = self.truncate(event['location'], 60)
+                            print(f"{Colors.CYAN}                  📍 {location}{Colors.RESET}")
             else:
-                print("  No events")
+                print(f"{Colors.DIM}  No events{Colors.RESET}")
         
-        print("\n" + "="*80 + "\n")
+        print(f"\n{Colors.BOLD}{'='*80}{Colors.RESET}\n")
         
         # Summary
         total_events = sum(len(events) for events in week_events.values())
-        print(f"Total events this week: {total_events}")
+        print(f"{Colors.BOLD}Total events this week: {total_events}{Colors.RESET}")
 
 
 def find_default_config():
-    """Look for calends.json in current directory."""
-    default_names = ['calends.json', 'calendars.json']
+    """Look for calendars.json in current directory."""
+    default_names = ['calendars.json', 'calends.json']
     
     for name in default_names:
         if os.path.isfile(name):
@@ -369,8 +433,18 @@ def main():
         help='Timezone for display (e.g., +0530, -0800, UTC, local)',
         default=None
     )
+    parser.add_argument(
+        '--no-color',
+        action='store_true',
+        help='Disable colored output',
+        default=False
+    )
     
     args = parser.parse_args()
+    
+    # Disable colors if requested or if output is not a TTY
+    if args.no_color or not sys.stdout.isatty():
+        Colors.disable()
     
     # Parse start date if provided
     start_date = None
@@ -437,3 +511,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
