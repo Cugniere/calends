@@ -56,7 +56,7 @@ class ICalParser:
 
     def parse_event(self, lines):
         event = {'summary': 'Untitled Event', 'start': None, 'end': None,
-                 'location': '', 'description': ''}
+                'location': '', 'description': '', 'rrule': None}
         for line in lines:
             if line.startswith('SUMMARY:'):
                 event['summary'] = line[8:]
@@ -68,6 +68,8 @@ class ICalParser:
                 event['location'] = line[9:]
             elif line.startswith('DESCRIPTION:'):
                 event['description'] = line[12:]
+            elif line.startswith('RRULE:'):
+                event['rrule'] = self.parse_rrule(line)
         
         # If no timezone is specified, assume that it is from the current timezone
         if event['start'] and not event['start'].tzinfo:
@@ -79,6 +81,75 @@ class ICalParser:
             event['end'] = event['start'] + timedelta(hours=1)
 
         return event
+
+    def parse_rrule(self, rrule_line):
+        """Parse RRULE and return a dict of rule components"""
+        if not rrule_line.startswith('RRULE:'):
+            return None
+        
+        rrule_str = rrule_line[6:]
+        rules = {}
+        for part in rrule_str.split(';'):
+            if '=' in part:
+                key, value = part.split('=', 1)
+                rules[key] = value
+        return rules
+
+    def expand_recurring_event(self, event, rrule, max_instances=100):
+        """Generate instances of a recurring event"""
+        if not rrule or not event['start']:
+            return [event]
+        
+        freq = rrule.get('FREQ')
+        count = int(rrule.get('COUNT', max_instances))
+        until = rrule.get('UNTIL')
+        interval = int(rrule.get('INTERVAL', 1))
+        
+        # Parse UNTIL if present
+        until_dt = None
+        if until:
+            until_dt = self.parse_datetime(until)
+        
+        instances = []
+        current_start = event['start']
+        duration = event['end'] - event['start'] if event['end'] else timedelta(hours=1)
+        
+        for i in range(count):
+            # Check if we've passed UNTIL date
+            if until_dt and current_start > until_dt:
+                break
+            
+            # Create instance
+            instance = event.copy()
+            instance['start'] = current_start
+            instance['end'] = current_start + duration
+            instances.append(instance)
+            
+            # Calculate next occurrence
+            if freq == 'DAILY':
+                current_start += timedelta(days=interval)
+            elif freq == 'WEEKLY':
+                current_start += timedelta(weeks=interval)
+            elif freq == 'MONTHLY':
+                # Simple monthly increment (doesn't handle all edge cases)
+                month = current_start.month + interval
+                year = current_start.year + (month - 1) // 12
+                month = ((month - 1) % 12) + 1
+                try:
+                    current_start = current_start.replace(year=year, month=month)
+                except ValueError:
+                    # Handle invalid dates (e.g., Jan 31 -> Feb 31)
+                    # Fall back to last day of month
+                    import calendar
+                    last_day = calendar.monthrange(year, month)[1]
+                    current_start = current_start.replace(year=year, month=month, day=last_day)
+            elif freq == 'YEARLY':
+                current_start = current_start.replace(year=current_start.year + interval)
+            else:
+                # Unsupported frequency
+                break
+        
+        return instances
 
     def expand_multiday_events(self):
         """Expand multi-day events into separate daily events"""
@@ -171,7 +242,12 @@ class ICalParser:
                 if event_lines:
                     event = self.parse_event(event_lines)
                     if event['start']:
-                        self.events.append(event)
+                        # Handle recurring events
+                        if event.get('rrule'):
+                            instances = self.expand_recurring_event(event, event['rrule'])
+                            self.events.extend(instances)
+                        else:
+                            self.events.append(event)
                 in_event = False
             elif in_event:
                 event_lines.append(line)
