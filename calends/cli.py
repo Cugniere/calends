@@ -106,7 +106,9 @@ For more information, visit: https://github.com/anthropics/claude-code
     if tz_str and tz:
         print(f"Using timezone: {tz_str}")
 
-    manager: CalendarManager = CalendarManager(target_timezone=tz, cache_expiration=cache_exp)
+    manager: CalendarManager = CalendarManager(
+        target_timezone=tz, cache_expiration=cache_exp
+    )
     manager.load_sources(sources)
 
     if manager.count_events() == 0:
