@@ -148,8 +148,10 @@ class TestExpandRecurringEvent:
 
 class TestExpandMultidayEvents:
     def test_expand_multiday_event(self):
-        parser = ICalParser()
-        parser.events = [
+        from calends.event_collection import EventCollection
+
+        collection = EventCollection()
+        collection.events = [
             {
                 "start": datetime(2025, 1, 14, 9, 0, 0, tzinfo=timezone.utc),
                 "end": datetime(2025, 1, 16, 18, 0, 0, tzinfo=timezone.utc),
@@ -159,15 +161,17 @@ class TestExpandMultidayEvents:
             }
         ]
 
-        parser.expand_multiday_events()
+        collection.expand_multiday_events()
 
-        assert len(parser.events) == 2
-        assert parser.events[0]["start"].day == 14
-        assert parser.events[1]["start"].day == 15
+        assert len(collection.events) == 2
+        assert collection.events[0]["start"].day == 14
+        assert collection.events[1]["start"].day == 15
 
     def test_single_day_event_unchanged(self):
-        parser = ICalParser()
-        parser.events = [
+        from calends.event_collection import EventCollection
+
+        collection = EventCollection()
+        collection.events = [
             {
                 "start": datetime(2025, 1, 15, 14, 0, 0, tzinfo=timezone.utc),
                 "end": datetime(2025, 1, 15, 15, 0, 0, tzinfo=timezone.utc),
@@ -177,10 +181,10 @@ class TestExpandMultidayEvents:
             }
         ]
 
-        parser.expand_multiday_events()
+        collection.expand_multiday_events()
 
-        assert len(parser.events) == 1
-        assert parser.events[0]["summary"] == "Meeting"
+        assert len(collection.events) == 1
+        assert collection.events[0]["summary"] == "Meeting"
 
 
 class TestUnfoldLines:

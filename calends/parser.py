@@ -1,34 +1,49 @@
-import sys
+"""Pure iCal parsing logic without I/O or state management."""
+
 import re
 from datetime import datetime, timedelta, timezone
-from urllib.request import urlopen, Request
-from urllib.error import URLError, HTTPError
 from typing import Optional, Any
-from .cache import Cache
 from .constants import (
-    DEFAULT_CACHE_EXPIRATION,
     DEFAULT_MAX_RECURRING_INSTANCES,
     DEFAULT_EVENT_DURATION_HOURS,
-    URL_FETCH_TIMEOUT,
 )
 
 EventDict = dict[str, Any]
 
 
 class ICalParser:
-    """Parse iCal files from url"""
+    """
+    Pure iCal parser focused on parsing logic only.
 
-    def __init__(
-        self,
-        target_timezone: Optional[timezone] = None,
-        cache_expiration: int = DEFAULT_CACHE_EXPIRATION,
-    ) -> None:
-        self.events: list[EventDict] = []
+    Handles parsing of iCal format including events, datetimes, and recurrence rules.
+    Does not handle I/O, caching, or state management.
+
+    Attributes:
+        target_timezone: Optional timezone for converting event times
+    """
+
+    def __init__(self, target_timezone: Optional[timezone] = None) -> None:
+        """
+        Initialize the parser.
+
+        Args:
+            target_timezone: Optional timezone to convert event times to
+        """
         self.target_timezone: Optional[timezone] = target_timezone
-        self.cache: Cache = Cache(expiration_seconds=cache_expiration)
 
     def unfold_lines(self, content: str) -> list[str]:
-        """Unfold lines that are split with CRLF + space/tab."""
+        """
+        Unfold iCal lines that are split with CRLF + space/tab.
+
+        The iCal format allows long lines to be folded by inserting
+        a newline followed by a space or tab.
+
+        Args:
+            content: Raw iCal content
+
+        Returns:
+            List of unfolded lines
+        """
         lines = content.replace("\r\n", "\n").replace("\r", "\n").split("\n")
         unfolded: list[str] = []
         current = ""
@@ -44,6 +59,20 @@ class ICalParser:
         return unfolded
 
     def parse_datetime(self, dt_string: str) -> Optional[datetime]:
+        """
+        Parse an iCal datetime string into a Python datetime object.
+
+        Supports multiple formats:
+        - YYYYMMDDTHHMMSSZ (UTC)
+        - YYYYMMDDTHHMMSS (local/floating)
+        - YYYYMMDD (date only)
+
+        Args:
+            dt_string: iCal datetime string, may include property parameters
+
+        Returns:
+            Parsed datetime object, or None if parsing fails
+        """
         if not dt_string:
             return None
         if ";" in dt_string or ":" in dt_string:
@@ -70,7 +99,37 @@ class ICalParser:
             dt = dt.astimezone(self.target_timezone)
         return dt
 
+    def parse_rrule(self, rrule_line: str) -> Optional[dict[str, str]]:
+        """
+        Parse an iCal RRULE (recurrence rule) string.
+
+        Args:
+            rrule_line: RRULE line from iCal file (e.g., "RRULE:FREQ=DAILY;COUNT=10")
+
+        Returns:
+            Dictionary of rule components, or None if not a valid RRULE
+        """
+        if not rrule_line.startswith("RRULE:"):
+            return None
+
+        rrule_str = rrule_line[6:]
+        rules: dict[str, str] = {}
+        for part in rrule_str.split(";"):
+            if "=" in part:
+                key, value = part.split("=", 1)
+                rules[key] = value
+        return rules
+
     def parse_event(self, lines: list[str]) -> EventDict:
+        """
+        Parse iCal event lines into an event dictionary.
+
+        Args:
+            lines: List of property lines from a VEVENT component
+
+        Returns:
+            Event dictionary with parsed properties
+        """
         event: EventDict = {
             "summary": "Untitled Event",
             "start": None,
@@ -105,26 +164,26 @@ class ICalParser:
 
         return event
 
-    def parse_rrule(self, rrule_line: str) -> Optional[dict[str, str]]:
-        """Parse RRULE and return a dict of rule components"""
-        if not rrule_line.startswith("RRULE:"):
-            return None
-
-        rrule_str = rrule_line[6:]
-        rules: dict[str, str] = {}
-        for part in rrule_str.split(";"):
-            if "=" in part:
-                key, value = part.split("=", 1)
-                rules[key] = value
-        return rules
-
     def expand_recurring_event(
         self,
         event: EventDict,
         rrule: dict[str, str],
         max_instances: int = DEFAULT_MAX_RECURRING_INSTANCES,
     ) -> list[EventDict]:
-        """Generate instances of a recurring event"""
+        """
+        Generate individual instances of a recurring event.
+
+        Supports DAILY, WEEKLY, MONTHLY, and YEARLY frequencies with
+        INTERVAL, COUNT, and UNTIL parameters.
+
+        Args:
+            event: Base event dictionary
+            rrule: Parsed recurrence rule
+            max_instances: Maximum number of instances to generate
+
+        Returns:
+            List of event instances
+        """
         if not rrule or not event["start"]:
             return [event]
 
@@ -180,89 +239,21 @@ class ICalParser:
 
         return instances
 
-    def expand_multiday_events(self) -> None:
-        """Expand multi-day events into separate daily events"""
-        expanded: list[EventDict] = []
-        for event in self.events:
-            if not event["start"] or not event["end"]:
-                expanded.append(event)
-                continue
+    def parse_ical_content(self, content: str) -> list[EventDict]:
+        """
+        Parse complete iCal content into a list of events.
 
-            start_date = event["start"].date()
-            end_date = event["end"].date()
+        Args:
+            content: Raw iCal file content
 
-            if start_date == end_date:
-                expanded.append(event)
-                continue
-
-            current_date = start_date
-            while current_date < end_date:
-                day_event = event.copy()
-
-                if current_date == start_date:
-                    day_event["start"] = event["start"]
-                    next_midnight = datetime.combine(
-                        current_date + timedelta(days=1), datetime.min.time()
-                    )
-                    if event["start"].tzinfo:
-                        next_midnight = next_midnight.replace(
-                            tzinfo=event["start"].tzinfo
-                        )
-                    day_event["end"] = next_midnight
-                elif current_date == end_date - timedelta(days=1):
-                    day_start = datetime.combine(current_date, datetime.min.time())
-                    if event["start"].tzinfo:
-                        day_start = day_start.replace(tzinfo=event["start"].tzinfo)
-                    day_event["start"] = day_start
-                    day_event["end"] = event["end"]
-                else:
-                    day_start = datetime.combine(current_date, datetime.min.time())
-                    day_end = datetime.combine(
-                        current_date + timedelta(days=1), datetime.min.time()
-                    )
-                    if event["start"].tzinfo:
-                        day_start = day_start.replace(tzinfo=event["start"].tzinfo)
-                        day_end = day_end.replace(tzinfo=event["start"].tzinfo)
-                    day_event["start"] = day_start
-                    day_event["end"] = day_end
-
-                expanded.append(day_event)
-                current_date += timedelta(days=1)
-
-        self.events = expanded
-
-    def fetch_from_url(self, url: str) -> str:
-        """Fetch iCal content from a URL or from cache"""
-        cached = self.cache.get(url)
-        if cached:
-            return cached
-
-        try:
-            req = Request(url, headers={"User-Agent": "iCal-Viewer/1.0"})
-            with urlopen(req, timeout=URL_FETCH_TIMEOUT) as response:
-                content = response.read().decode("utf-8")
-                self.cache.set(url, content)
-                return content
-        except HTTPError as e:
-            raise Exception(f"HTTP Error {e.code}: {e.reason}")
-        except URLError as e:
-            raise Exception(f"URL Error: {e.reason}")
-        except Exception as e:
-            raise Exception(f"Failed to fetch URL: {str(e)}")
-
-    def parse_file(self, source: str) -> None:
-        try:
-            if source.startswith("http://") or source.startswith("https://"):
-                content = self.fetch_from_url(source)
-            else:
-                with open(source, "r", encoding="utf-8") as f:
-                    content = f.read()
-        except Exception as e:
-            print(f"Error reading {source}: {e}", file=sys.stderr)
-            return
+        Returns:
+            List of parsed and expanded event dictionaries
+        """
         lines = self.unfold_lines(content)
+        events: list[EventDict] = []
         in_event = False
         event_lines: list[str] = []
+
         for line in lines:
             if line == "BEGIN:VEVENT":
                 in_event, event_lines = True, []
@@ -274,14 +265,11 @@ class ICalParser:
                             instances = self.expand_recurring_event(
                                 event, event["rrule"]
                             )
-                            self.events.extend(instances)
+                            events.extend(instances)
                         else:
-                            self.events.append(event)
+                            events.append(event)
                 in_event = False
             elif in_event:
                 event_lines.append(line)
 
-    def load_sources(self, sources: list[str]) -> None:
-        for src in sources:
-            self.parse_file(src)
-            self.expand_multiday_events()
+        return events

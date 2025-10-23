@@ -1,14 +1,17 @@
+"""Command-line interface for the calends calendar viewer."""
+
 import sys
 import argparse
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from .colors import Colors
-from .parser import ICalParser
+from .calendar_manager import CalendarManager
 from .view import WeeklyView
 from .config import find_default_config, load_config, parse_timezone
 
 
 def main() -> None:
+    """Main entry point for the calends CLI application."""
     parser = argparse.ArgumentParser(description="Terminal iCal Weekly Viewer")
     parser.add_argument("sources", nargs="*", help="One or more .ics URLs or paths")
     parser.add_argument("-c", "--config", help="Path to JSON config file")
@@ -54,12 +57,12 @@ def main() -> None:
     if tz_str and tz:
         print(f"Using timezone: {tz_str}")
 
-    parser_: ICalParser = ICalParser(target_timezone=tz, cache_expiration=cache_exp)
-    parser_.load_sources(sources)
+    manager: CalendarManager = CalendarManager(target_timezone=tz, cache_expiration=cache_exp)
+    manager.load_sources(sources)
 
-    if not parser_.events:
+    if manager.count_events() == 0:
         print("No events found.", file=sys.stderr)
         sys.exit(1)
 
-    view: WeeklyView = WeeklyView(parser_.events, start, tz)
+    view: WeeklyView = WeeklyView(manager.get_all_events(), start, tz)
     view.display()

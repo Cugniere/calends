@@ -1,3 +1,5 @@
+"""Configuration file loading and timezone parsing utilities."""
+
 import os
 import sys
 import json
@@ -8,6 +10,14 @@ from .constants import DEFAULT_CONFIG_FILES, DEFAULT_CACHE_EXPIRATION_CONFIG
 
 
 def find_default_config() -> Optional[str]:
+    """
+    Find a default configuration file in the current directory.
+
+    Searches for configuration files in priority order.
+
+    Returns:
+        Path to the first found config file, or None if none found
+    """
     for name in DEFAULT_CONFIG_FILES:
         if os.path.isfile(name):
             return name
@@ -15,6 +25,20 @@ def find_default_config() -> Optional[str]:
 
 
 def parse_timezone(tz_string: Optional[str]) -> Optional[timezone]:
+    """
+    Parse a timezone string into a timezone object.
+
+    Supports:
+    - "UTC" or "GMT"
+    - "LOCAL" (returns None for system local time)
+    - Offset format: "+05:30", "-08:00", etc.
+
+    Args:
+        tz_string: Timezone string to parse
+
+    Returns:
+        Parsed timezone object, or None for local/invalid timezones
+    """
     if not tz_string:
         return None
     s = tz_string.strip().upper()
@@ -31,6 +55,23 @@ def parse_timezone(tz_string: Optional[str]) -> Optional[timezone]:
 
 
 def load_config(path: str) -> tuple[list[str], Optional[str], int]:
+    """
+    Load calendar configuration from a JSON file.
+
+    Expected JSON structure:
+    {
+        "calendars": ["url1", "url2", ...],
+        "timezone": "UTC" or "+05:30",
+        "cache_expiration": 3600
+    }
+
+    Args:
+        path: Path to the JSON configuration file
+
+    Returns:
+        Tuple of (calendar_sources, timezone_string, cache_expiration)
+        Returns empty values on error
+    """
     try:
         with open(path, encoding="utf-8") as f:
             cfg = json.load(f)
