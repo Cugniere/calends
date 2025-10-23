@@ -3,21 +3,27 @@ import re
 from datetime import datetime, timedelta, timezone
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
+from typing import Optional, Any
 from .cache import Cache
+
+EventDict = dict[str, Any]
 
 
 class ICalParser:
     """Parse iCal files from url"""
 
-    def __init__(self, target_timezone=None, cache_expiration=60):
-        self.events = []
-        self.target_timezone = target_timezone
-        self.cache = Cache(expiration_seconds=cache_expiration)
+    def __init__(
+        self, target_timezone: Optional[timezone] = None, cache_expiration: int = 60
+    ) -> None:
+        self.events: list[EventDict] = []
+        self.target_timezone: Optional[timezone] = target_timezone
+        self.cache: Cache = Cache(expiration_seconds=cache_expiration)
 
-    def unfold_lines(self, content: str):
+    def unfold_lines(self, content: str) -> list[str]:
         """Unfold lines that are split with CRLF + space/tab."""
         lines = content.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-        unfolded, current = [], ""
+        unfolded: list[str] = []
+        current = ""
         for line in lines:
             if line and line[0] in (" ", "\t"):
                 current += line[1:]
@@ -29,17 +35,18 @@ class ICalParser:
             unfolded.append(current)
         return unfolded
 
-    def parse_datetime(self, dt_string: str):
+    def parse_datetime(self, dt_string: str) -> Optional[datetime]:
         if not dt_string:
             return None
         if ";" in dt_string or ":" in dt_string:
             dt_string = dt_string.split(":")[-1]
-        formats = [
+        formats: list[tuple[str, bool]] = [
             ("%Y%m%dT%H%M%SZ", True),
             ("%Y%m%dT%H%M%S", False),
             ("%Y%m%d", False),
         ]
-        dt, is_utc = None, False
+        dt: Optional[datetime] = None
+        is_utc = False
         for fmt, utc_flag in formats:
             try:
                 dt = datetime.strptime(dt_string, fmt)
@@ -55,8 +62,8 @@ class ICalParser:
             dt = dt.astimezone(self.target_timezone)
         return dt
 
-    def parse_event(self, lines):
-        event = {
+    def parse_event(self, lines: list[str]) -> EventDict:
+        event: EventDict = {
             "summary": "Untitled Event",
             "start": None,
             "end": None,
@@ -78,7 +85,6 @@ class ICalParser:
             elif line.startswith("RRULE:"):
                 event["rrule"] = self.parse_rrule(line)
 
-        # If no timezone is specified, assume that it is from the current timezone
         if event["start"] and not event["start"].tzinfo:
             event["start"] = event["start"].replace(tzinfo=self.target_timezone)
         if event["end"] and not event["end"].tzinfo:
@@ -89,20 +95,22 @@ class ICalParser:
 
         return event
 
-    def parse_rrule(self, rrule_line):
+    def parse_rrule(self, rrule_line: str) -> Optional[dict[str, str]]:
         """Parse RRULE and return a dict of rule components"""
         if not rrule_line.startswith("RRULE:"):
             return None
 
         rrule_str = rrule_line[6:]
-        rules = {}
+        rules: dict[str, str] = {}
         for part in rrule_str.split(";"):
             if "=" in part:
                 key, value = part.split("=", 1)
                 rules[key] = value
         return rules
 
-    def expand_recurring_event(self, event, rrule, max_instances=100):
+    def expand_recurring_event(
+        self, event: EventDict, rrule: dict[str, str], max_instances: int = 100
+    ) -> list[EventDict]:
         """Generate instances of a recurring event"""
         if not rrule or not event["start"]:
             return [event]
@@ -112,41 +120,36 @@ class ICalParser:
         until = rrule.get("UNTIL")
         interval = int(rrule.get("INTERVAL", 1))
 
-        # Parse UNTIL if present
-        until_dt = None
+        until_dt: Optional[datetime] = None
         if until:
             until_dt = self.parse_datetime(until)
 
-        instances = []
-        current_start = event["start"]
-        duration = event["end"] - event["start"] if event["end"] else timedelta(hours=1)
+        instances: list[EventDict] = []
+        current_start: datetime = event["start"]
+        duration: timedelta = (
+            event["end"] - event["start"] if event["end"] else timedelta(hours=1)
+        )
 
         for i in range(count):
-            # Check if we've passed UNTIL date
             if until_dt and current_start > until_dt:
                 break
 
-            # Create instance
             instance = event.copy()
             instance["start"] = current_start
             instance["end"] = current_start + duration
             instances.append(instance)
 
-            # Calculate next occurrence
             if freq == "DAILY":
                 current_start += timedelta(days=interval)
             elif freq == "WEEKLY":
                 current_start += timedelta(weeks=interval)
             elif freq == "MONTHLY":
-                # Simple monthly increment (doesn't handle all edge cases)
                 month = current_start.month + interval
                 year = current_start.year + (month - 1) // 12
                 month = ((month - 1) % 12) + 1
                 try:
                     current_start = current_start.replace(year=year, month=month)
                 except ValueError:
-                    # Handle invalid dates (e.g., Jan 31 -> Feb 31)
-                    # Fall back to last day of month
                     import calendar
 
                     last_day = calendar.monthrange(year, month)[1]
@@ -158,37 +161,31 @@ class ICalParser:
                     year=current_start.year + interval
                 )
             else:
-                # Unsupported frequency
                 break
 
         return instances
 
-    def expand_multiday_events(self):
+    def expand_multiday_events(self) -> None:
         """Expand multi-day events into separate daily events"""
-        expanded = []
+        expanded: list[EventDict] = []
         for event in self.events:
             if not event["start"] or not event["end"]:
                 expanded.append(event)
                 continue
 
-            # Get date-only parts for comparison
             start_date = event["start"].date()
             end_date = event["end"].date()
 
-            # If same day, keep as-is
             if start_date == end_date:
                 expanded.append(event)
                 continue
 
-            # Create an event for each day (end_date is exclusive)
             current_date = start_date
-            while current_date < end_date:  # Changed from <= to
+            while current_date < end_date:
                 day_event = event.copy()
 
-                # First day: use original start time
                 if current_date == start_date:
                     day_event["start"] = event["start"]
-                    # End at midnight of next day
                     next_midnight = datetime.combine(
                         current_date + timedelta(days=1), datetime.min.time()
                     )
@@ -197,14 +194,12 @@ class ICalParser:
                             tzinfo=event["start"].tzinfo
                         )
                     day_event["end"] = next_midnight
-                # Last day: start at midnight, use original end time
                 elif current_date == end_date - timedelta(days=1):
                     day_start = datetime.combine(current_date, datetime.min.time())
                     if event["start"].tzinfo:
                         day_start = day_start.replace(tzinfo=event["start"].tzinfo)
                     day_event["start"] = day_start
                     day_event["end"] = event["end"]
-                # Middle days: full day
                 else:
                     day_start = datetime.combine(current_date, datetime.min.time())
                     day_end = datetime.combine(
@@ -240,7 +235,7 @@ class ICalParser:
         except Exception as e:
             raise Exception(f"Failed to fetch URL: {str(e)}")
 
-    def parse_file(self, source: str):
+    def parse_file(self, source: str) -> None:
         try:
             if source.startswith("http://") or source.startswith("https://"):
                 content = self.fetch_from_url(source)
@@ -251,7 +246,8 @@ class ICalParser:
             print(f"Error reading {source}: {e}", file=sys.stderr)
             return
         lines = self.unfold_lines(content)
-        in_event, event_lines = False, []
+        in_event = False
+        event_lines: list[str] = []
         for line in lines:
             if line == "BEGIN:VEVENT":
                 in_event, event_lines = True, []
@@ -259,7 +255,6 @@ class ICalParser:
                 if event_lines:
                     event = self.parse_event(event_lines)
                     if event["start"]:
-                        # Handle recurring events
                         if event.get("rrule"):
                             instances = self.expand_recurring_event(
                                 event, event["rrule"]
@@ -271,7 +266,7 @@ class ICalParser:
             elif in_event:
                 event_lines.append(line)
 
-    def load_sources(self, sources):
+    def load_sources(self, sources: list[str]) -> None:
         for src in sources:
             self.parse_file(src)
             self.expand_multiday_events()

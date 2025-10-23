@@ -1,13 +1,14 @@
 import sys
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 from .colors import Colors
 from .parser import ICalParser
 from .view import WeeklyView
 from .config import find_default_config, load_config, parse_timezone
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Terminal iCal Weekly Viewer")
     parser.add_argument("sources", nargs="*", help="One or more .ics URLs or paths")
     parser.add_argument("-c", "--config", help="Path to JSON config file")
@@ -19,7 +20,7 @@ def main():
     if args.no_color or not sys.stdout.isatty():
         Colors.disable()
 
-    start = None
+    start: Optional[datetime] = None
     if args.date:
         try:
             start = datetime.strptime(args.date, "%Y-%m-%d")
@@ -29,7 +30,9 @@ def main():
             print("Invalid date format. Use YYYY-MM-DD", file=sys.stderr)
             sys.exit(1)
 
-    sources, tz_str, cache_exp = [], None, 60
+    sources: list[str] = []
+    tz_str: Optional[str] = None
+    cache_exp: int = 60
     if args.config:
         s, tz_str, cache_exp = load_config(args.config)
         sources += s
@@ -47,16 +50,16 @@ def main():
         sys.exit(1)
 
     tz_str = args.timezone or tz_str
-    tz = parse_timezone(tz_str) if tz_str else None
+    tz: Optional[timezone] = parse_timezone(tz_str) if tz_str else None
     if tz_str and tz:
         print(f"Using timezone: {tz_str}")
 
-    parser_ = ICalParser(target_timezone=tz, cache_expiration=cache_exp)
+    parser_: ICalParser = ICalParser(target_timezone=tz, cache_expiration=cache_exp)
     parser_.load_sources(sources)
 
     if not parser_.events:
         print("No events found.", file=sys.stderr)
         sys.exit(1)
 
-    view = WeeklyView(parser_.events, start, tz)
+    view: WeeklyView = WeeklyView(parser_.events, start, tz)
     view.display()

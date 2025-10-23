@@ -1,19 +1,21 @@
 import os
 import pickle
 import time
-from datetime import datetime
+from typing import Any, Optional
 
 
 class Cache:
     """Simple pickle-based cache with expiration."""
 
-    def __init__(self, path=".calends.pkl", expiration_seconds=60):
-        self.path = path
-        self.expiration = expiration_seconds
-        self._data = {}
+    def __init__(
+        self, path: str = ".calends.pkl", expiration_seconds: int = 60
+    ) -> None:
+        self.path: str = path
+        self.expiration: int = expiration_seconds
+        self._data: dict[str, dict[str, Any]] = {}
         self._load()
 
-    def _load(self):
+    def _load(self) -> None:
         """Load cache from pickle file if it exists."""
         if os.path.isfile(self.path):
             try:
@@ -22,27 +24,26 @@ class Cache:
             except Exception:
                 self._data = {}
 
-    def _save(self):
+    def _save(self) -> None:
         """Persist cache to pickle file."""
         try:
             with open(self.path, "wb") as f:
                 pickle.dump(self._data, f)
         except Exception:
-            pass  # Ignore save errors silently
+            pass
 
-    def get(self, key):
+    def get(self, key: str) -> Optional[Any]:
         """Return cached value if still valid."""
         entry = self._data.get(key)
         if not entry:
             return None
         timestamp = entry.get("timestamp")
         if time.time() - timestamp > self.expiration:
-            # Expired
             self._data.pop(key, None)
             return None
         return entry.get("content")
 
-    def set(self, key, content):
+    def set(self, key: str, content: Any) -> None:
         """Cache new content."""
         self._data[key] = {"timestamp": time.time(), "content": content}
         self._save()

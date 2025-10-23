@@ -1,26 +1,34 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 from collections import defaultdict
+from typing import Optional, Any
 from .colors import Colors
+
+EventDict = dict[str, Any]
 
 
 class WeeklyView:
     """Display events in a weekly terminal view."""
 
-    def __init__(self, events, start_date=None, target_timezone=None):
-        self.events = events
-        self.target_timezone = target_timezone or timezone.utc
-        self.start_date = start_date or self.get_monday()
+    def __init__(
+        self,
+        events: list[EventDict],
+        start_date: Optional[datetime] = None,
+        target_timezone: Optional[timezone] = None,
+    ) -> None:
+        self.events: list[EventDict] = events
+        self.target_timezone: timezone = target_timezone or timezone.utc
+        self.start_date: datetime = start_date or self.get_monday()
         if self.start_date.tzinfo is None:
             self.start_date = self.start_date.replace(tzinfo=self.target_timezone)
-        self.end_date = self.start_date + timedelta(days=7)
+        self.end_date: datetime = self.start_date + timedelta(days=7)
 
-    def get_monday(self):
+    def get_monday(self) -> datetime:
         today = datetime.now()
         monday = today - timedelta(days=today.weekday())
         return monday.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    def filter_events_for_week(self):
-        week_events = defaultdict(list)
+    def filter_events_for_week(self) -> defaultdict[date, list[EventDict]]:
+        week_events: defaultdict[date, list[EventDict]] = defaultdict(list)
         for e in self.events:
             if e["start"] and self.start_date <= e["start"] < self.end_date:
                 week_events[e["start"].date()].append(e)
@@ -28,13 +36,13 @@ class WeeklyView:
             week_events[day].sort(key=lambda ev: ev["start"])
         return week_events
 
-    def format_time(self, dt):
+    def format_time(self, dt: datetime) -> str:
         return dt.strftime("%H:%M")
 
-    def truncate(self, text, n):
+    def truncate(self, text: str, n: int) -> str:
         return text if len(text) <= n else text[: n - 3] + "..."
 
-    def display(self):
+    def display(self) -> None:
         week = self.filter_events_for_week()
         now = datetime.now(self.target_timezone)
         week_number = now.isocalendar().week

@@ -1,15 +1,19 @@
-import os, sys, json, re
+import os
+import sys
+import json
+import re
 from datetime import timedelta, timezone
+from typing import Optional
 
 
-def find_default_config():
+def find_default_config() -> Optional[str]:
     for name in ["calendars.json", "calends.json"]:
         if os.path.isfile(name):
             return name
     return None
 
 
-def parse_timezone(tz_string):
+def parse_timezone(tz_string: Optional[str]) -> Optional[timezone]:
     if not tz_string:
         return None
     s = tz_string.strip().upper()
@@ -25,16 +29,16 @@ def parse_timezone(tz_string):
     return None
 
 
-def load_config(path):
+def load_config(path: str) -> tuple[list[str], Optional[str], int]:
     try:
         with open(path, encoding="utf-8") as f:
             cfg = json.load(f)
         if not isinstance(cfg.get("calendars"), list):
             raise ValueError("'calendars' must be a list")
 
-        calendars = cfg["calendars"]
-        timezone_str = cfg.get("timezone")
-        cache_expiration = int(cfg.get("cache_expiration", 60))
+        calendars: list[str] = cfg["calendars"]
+        timezone_str: Optional[str] = cfg.get("timezone")
+        cache_expiration: int = int(cfg.get("cache_expiration", 60))
 
         return calendars, timezone_str, cache_expiration
     except Exception as e:
