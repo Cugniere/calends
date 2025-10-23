@@ -4,10 +4,11 @@ import json
 import re
 from datetime import timedelta, timezone
 from typing import Optional
+from .constants import DEFAULT_CONFIG_FILES, DEFAULT_CACHE_EXPIRATION_CONFIG
 
 
 def find_default_config() -> Optional[str]:
-    for name in ["calendars.json", "calends.json"]:
+    for name in DEFAULT_CONFIG_FILES:
         if os.path.isfile(name):
             return name
     return None
@@ -38,9 +39,11 @@ def load_config(path: str) -> tuple[list[str], Optional[str], int]:
 
         calendars: list[str] = cfg["calendars"]
         timezone_str: Optional[str] = cfg.get("timezone")
-        cache_expiration: int = int(cfg.get("cache_expiration", 60))
+        cache_expiration: int = int(
+            cfg.get("cache_expiration", DEFAULT_CACHE_EXPIRATION_CONFIG)
+        )
 
         return calendars, timezone_str, cache_expiration
     except Exception as e:
         print(f"Error loading config: {e}", file=sys.stderr)
-        return [], None, 60
+        return [], None, DEFAULT_CACHE_EXPIRATION_CONFIG

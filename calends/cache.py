@@ -2,13 +2,16 @@ import os
 import pickle
 import time
 from typing import Any, Optional
+from .constants import DEFAULT_CACHE_PATH, DEFAULT_CACHE_EXPIRATION
 
 
 class Cache:
     """Simple pickle-based cache with expiration."""
 
     def __init__(
-        self, path: str = ".calends.pkl", expiration_seconds: int = 60
+        self,
+        path: str = DEFAULT_CACHE_PATH,
+        expiration_seconds: int = DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         self.path: str = path
         self.expiration: int = expiration_seconds

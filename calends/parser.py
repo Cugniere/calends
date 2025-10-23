@@ -5,6 +5,12 @@ from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 from typing import Optional, Any
 from .cache import Cache
+from .constants import (
+    DEFAULT_CACHE_EXPIRATION,
+    DEFAULT_MAX_RECURRING_INSTANCES,
+    DEFAULT_EVENT_DURATION_HOURS,
+    URL_FETCH_TIMEOUT,
+)
 
 EventDict = dict[str, Any]
 
@@ -13,7 +19,9 @@ class ICalParser:
     """Parse iCal files from url"""
 
     def __init__(
-        self, target_timezone: Optional[timezone] = None, cache_expiration: int = 60
+        self,
+        target_timezone: Optional[timezone] = None,
+        cache_expiration: int = DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         self.events: list[EventDict] = []
         self.target_timezone: Optional[timezone] = target_timezone
@@ -91,7 +99,9 @@ class ICalParser:
             event["end"] = event["end"].replace(tzinfo=self.target_timezone)
 
         if event["start"] and not event["end"]:
-            event["end"] = event["start"] + timedelta(hours=1)
+            event["end"] = event["start"] + timedelta(
+                hours=DEFAULT_EVENT_DURATION_HOURS
+            )
 
         return event
 
@@ -109,7 +119,10 @@ class ICalParser:
         return rules
 
     def expand_recurring_event(
-        self, event: EventDict, rrule: dict[str, str], max_instances: int = 100
+        self,
+        event: EventDict,
+        rrule: dict[str, str],
+        max_instances: int = DEFAULT_MAX_RECURRING_INSTANCES,
     ) -> list[EventDict]:
         """Generate instances of a recurring event"""
         if not rrule or not event["start"]:
@@ -127,7 +140,9 @@ class ICalParser:
         instances: list[EventDict] = []
         current_start: datetime = event["start"]
         duration: timedelta = (
-            event["end"] - event["start"] if event["end"] else timedelta(hours=1)
+            event["end"] - event["start"]
+            if event["end"]
+            else timedelta(hours=DEFAULT_EVENT_DURATION_HOURS)
         )
 
         for i in range(count):
@@ -224,7 +239,7 @@ class ICalParser:
 
         try:
             req = Request(url, headers={"User-Agent": "iCal-Viewer/1.0"})
-            with urlopen(req, timeout=10) as response:
+            with urlopen(req, timeout=URL_FETCH_TIMEOUT) as response:
                 content = response.read().decode("utf-8")
                 self.cache.set(url, content)
                 return content
