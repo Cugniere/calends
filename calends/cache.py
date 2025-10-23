@@ -6,7 +6,7 @@ from datetime import datetime
 class Cache:
     """Simple pickle-based cache with expiration."""
     
-    def __init__(self, path=".ical_cache.pkl", expiration_seconds=60):
+    def __init__(self, path=".calends.pkl", expiration_seconds=60):
         self.path = path
         self.expiration = expiration_seconds
         self._data = {}
