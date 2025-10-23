@@ -11,7 +11,7 @@ def parse_timezone(tz_string):
     if not tz_string:
         return None
     s = tz_string.strip().upper()
-    if s in ('UTC','GMT'):
+    if s in ('UTC', 'GMT'):
         return timezone.utc
     if s == 'LOCAL':
         return None
@@ -28,7 +28,12 @@ def load_config(path):
             cfg = json.load(f)
         if not isinstance(cfg.get('calendars'), list):
             raise ValueError("'calendars' must be a list")
-        return cfg['calendars'], cfg.get('timezone')
+
+        calendars = cfg['calendars']
+        timezone_str = cfg.get('timezone')
+        cache_expiration = int(cfg.get('cache_expiration', 60))
+
+        return calendars, timezone_str, cache_expiration
     except Exception as e:
         print(f"Error loading config: {e}", file=sys.stderr)
-        return [], None
+        return [], None, 60

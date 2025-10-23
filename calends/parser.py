@@ -3,13 +3,15 @@ import re
 from datetime import datetime, timedelta, timezone
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
+from .cache import Cache
 
 class ICalParser:
-    """Parse iCal files without external dependencies."""
+    """Parse iCal files from url"""
 
-    def __init__(self, target_timezone=None):
+    def __init__(self, target_timezone=None, cache_expiration=60):
         self.events = []
         self.target_timezone = target_timezone
+        self.cache = Cache(expiration_seconds=cache_expiration)
 
     def unfold_lines(self, content: str):
         """Unfold lines that are split with CRLF + space/tab."""
@@ -72,21 +74,30 @@ class ICalParser:
             event['start'] = event['start'].replace(tzinfo=self.target_timezone)
         if event['end'] and not event['end'].tzinfo:
             event['end'] = event['end'].replace(tzinfo=self.target_timezone)
-            
+
         if event['start'] and not event['end']:
             event['end'] = event['start'] + timedelta(hours=1)
 
         return event
 
     def fetch_from_url(self, url: str) -> str:
+        """Fetch iCal content from a URL or from cache"""
+        cached = self.cache.get(url)
+        if cached:
+            return cached
+
         try:
             req = Request(url, headers={'User-Agent': 'iCal-Viewer/1.0'})
             with urlopen(req, timeout=10) as response:
-                return response.read().decode('utf-8')
+                content = response.read().decode('utf-8')
+                self.cache.set(url, content)
+                return content
         except HTTPError as e:
             raise Exception(f"HTTP Error {e.code}: {e.reason}")
         except URLError as e:
             raise Exception(f"URL Error: {e.reason}")
+        except Exception as e:
+            raise Exception(f"Failed to fetch URL: {str(e)}")
 
     def parse_file(self, source: str):
         try:
