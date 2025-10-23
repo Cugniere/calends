@@ -23,17 +23,53 @@ class WeeklyView:
         self.end_date: datetime = self.start_date + timedelta(days=7)
 
     def get_monday(self) -> datetime:
-        today = datetime.now()
+        """
+        Get the Monday of the current week in the target timezone.
+
+        Returns:
+            Datetime object for Monday at midnight
+        """
+        today = datetime.now(self.target_timezone)
         monday = today - timedelta(days=today.weekday())
         return monday.replace(hour=0, minute=0, second=0, microsecond=0)
 
+    def _ensure_timezone(self, dt: Optional[datetime]) -> Optional[datetime]:
+        """
+        Ensure a datetime has timezone info.
+
+        Args:
+            dt: Datetime to check
+
+        Returns:
+            Datetime with timezone info, or None if input is None
+        """
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=self.target_timezone)
+        return dt
+
     def filter_events_for_week(self) -> defaultdict[date, list[EventDict]]:
+        """
+        Filter events that fall within the current week.
+
+        Returns:
+            Dictionary mapping dates to lists of events for that day
+        """
         week_events: defaultdict[date, list[EventDict]] = defaultdict(list)
         for e in self.events:
-            if e["start"] and self.start_date <= e["start"] < self.end_date:
-                week_events[e["start"].date()].append(e)
+            if not e["start"]:
+                continue
+
+            # Ensure event start time has timezone info for comparison
+            event_start = self._ensure_timezone(e["start"])
+
+            if self.start_date <= event_start < self.end_date:
+                week_events[event_start.date()].append(e)
+
+        # Sort events by start time, ensuring all have timezone info
         for day in week_events:
-            week_events[day].sort(key=lambda ev: ev["start"])
+            week_events[day].sort(key=lambda ev: self._ensure_timezone(ev["start"]))
         return week_events
 
     def format_time(self, dt: datetime) -> str:
@@ -76,8 +112,10 @@ class WeeklyView:
                     )
                     time_range = f"{start} - {end}" if start != end else "All day"
 
-                    # Check if event is currently ongoing
-                    is_ongoing = e["start"] <= now < e["end"]
+                    # Check if event is currently ongoing (ensure timezone-aware comparison)
+                    event_start = self._ensure_timezone(e["start"])
+                    event_end = self._ensure_timezone(e["end"])
+                    is_ongoing = event_start <= now < event_end
 
                     # Set background and text color
                     if is_ongoing:
@@ -91,7 +129,7 @@ class WeeklyView:
                             loc_line = f"                   ⚲ {self.truncate(e['location'],60)}"
                             loc_line = loc_line.ljust(80)
                             print(f"{bg_color}{Colors.CYAN}{loc_line}{Colors.RESET}")
-                    elif e["end"] < now:
+                    elif event_end < now:
                         print(
                             f"{Colors.DIM}  {time_range:<15}{Colors.RESET}{e['summary']}{Colors.RESET}"
                         )
