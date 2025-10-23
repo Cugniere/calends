@@ -92,7 +92,7 @@ class ICalParser:
         
         # Handle different formats
         formats = [
-            ('%Y%m%dT%H%M%SZ', True),      # 20231025T143000Z (UTC)
+            ('%Y%m%dT%H%M%SZ', True),       # 20231025T143000Z (UTC)
             ('%Y%m%dT%H%M%S', False),       # 20231025T143000 (local/no timezone)
             ('%Y%m%d', False),              # 20231025 (date only)
         ]
@@ -213,7 +213,7 @@ class ICalParser:
 class WeeklyView:
     """Display events in a weekly terminal view."""
     
-    def __init__(self, events, start_date=None):
+    def __init__(self, events, start_date=None, target_timezone=None):
         self.events = events
         # Determine if we need timezone-aware dates
         has_tz_aware = any(e['start'] and e['start'].tzinfo for e in events if e['start'])
@@ -222,6 +222,11 @@ class WeeklyView:
             self.start_date = start_date
         else:
             self.start_date = self.get_monday_of_current_week()
+
+        if target_timezone:
+            self.target_timezone = target_timezone
+        else:
+            self.target_timezone = timezone.utc
         
         # Make start_date timezone-aware if events are timezone-aware
         if has_tz_aware and self.start_date.tzinfo is None:
@@ -281,10 +286,12 @@ class WeeklyView:
         now = datetime.now()
         if self.start_date.tzinfo:
             now = datetime.now(timezone.utc)
+
+        week_number = datetime.now(self.target_timezone).isocalendar().week
         
         # Print header
         print(f"\n{Colors.BOLD}{'='*80}{Colors.RESET}")
-        print(f"{Colors.BOLD}{Colors.CYAN}Week of {self.start_date.strftime('%B %d, %Y')}{Colors.RESET}")
+        print(f"{Colors.BOLD}{Colors.CYAN}Week {week_number}, {self.start_date.strftime('%B %Y')}{Colors.RESET}")
         print(f"{Colors.BOLD}{'='*80}{Colors.RESET}\n")
         
         # Display each day
@@ -295,36 +302,40 @@ class WeeklyView:
             day_key = current_date.date()
             
             # Check if this is today
-            is_today = day_key == now.date()
+            is_today = day_key == datetime.now(self.target_timezone).date()
+
+            # Check if day is in the past
+            is_past_day = day_key < datetime.now(self.target_timezone).date()
+
+            day_color = Colors.DIM if is_past_day else Colors.WHITE
             
             # Day header with color
             if is_today:
                 print(f"\n{Colors.BOLD}{Colors.GREEN}{day_name}, {current_date.strftime('%B %d')} (Today){Colors.RESET}")
             else:
-                print(f"\n{Colors.BOLD}{day_name}, {current_date.strftime('%B %d')}{Colors.RESET}")
+                print(f"\n{Colors.BOLD}{day_color}{day_name}, {current_date.strftime('%B %d')}{Colors.RESET}")
             print(f"{Colors.DIM}{'-' * 80}{Colors.RESET}")
             
             if day_key in week_events and week_events[day_key]:
                 for event in week_events[day_key]:
                     start_time = self.format_time(event['start'])
                     end_time = self.format_time(event['end'])
+                    time_range = "All day      " if start_time == end_time else f"{start_time} - {end_time}"
                     summary = self.truncate(event['summary'], 50)
                     
                     # Determine if event is in the past
                     is_past = event['end'] < now
+
+                    title_color = Colors.DIM if is_past else Colors.BLUE
+                    entry_color = Colors.DIM if is_past else Colors.WHITE
+                    location_color = Colors.DIM if is_past else Colors.CYAN
+
+                    print(f"{title_color}  {time_range}{Colors.RESET}  {entry_color}{summary}{Colors.RESET}")
+                    if event['location']:
+                        location = self.truncate(event['location'], 60)
+                        print(f"{location_color}                  ⚲ {location}{Colors.RESET}")
                     
-                    if is_past:
-                        # Past events in light grey
-                        print(f"{Colors.LIGHT_GREY}  {start_time} - {end_time}  {summary}{Colors.RESET}")
-                        if event['location']:
-                            location = self.truncate(event['location'], 60)
-                            print(f"{Colors.LIGHT_GREY}                  📍 {location}{Colors.RESET}")
-                    else:
-                        # Current/future events with colored time
-                        print(f"{Colors.BLUE}  {start_time} - {end_time}{Colors.RESET}  {summary}")
-                        if event['location']:
-                            location = self.truncate(event['location'], 60)
-                            print(f"{Colors.CYAN}                  📍 {location}{Colors.RESET}")
+                    
             else:
                 print(f"{Colors.DIM}  No events{Colors.RESET}")
         
@@ -505,7 +516,7 @@ def main():
         sys.exit(1)
     
     # Display weekly view
-    weekly_view = WeeklyView(ical_parser.events, start_date)
+    weekly_view = WeeklyView(ical_parser.events, start_date, target_tz)
     weekly_view.display()
 
 
