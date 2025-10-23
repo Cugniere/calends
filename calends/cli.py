@@ -78,42 +78,78 @@ For more information, visit: https://github.com/anthropics/claude-code
             start = datetime.strptime(args.date, "%Y-%m-%d")
             start -= timedelta(days=start.weekday())
             start = start.replace(hour=0, minute=0)
-        except ValueError:
-            print("Invalid date format. Use YYYY-MM-DD", file=sys.stderr)
+        except ValueError as e:
+            print(f"Error: Invalid date format '{args.date}'. Use YYYY-MM-DD (e.g., 2025-01-15)", file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:
+            print(f"Error: Failed to parse date: {e}", file=sys.stderr)
             sys.exit(1)
 
     sources: list[str] = []
     tz_str: Optional[str] = None
     cache_exp: int = 60
     if args.config:
-        s, tz_str, cache_exp = load_config(args.config)
-        sources += s
+        try:
+            s, tz_str, cache_exp = load_config(args.config)
+            sources += s
+        except FileNotFoundError:
+            print(f"Error: Config file not found: {args.config}", file=sys.stderr)
+            sys.exit(1)
+        except PermissionError:
+            print(f"Error: Permission denied reading config file: {args.config}", file=sys.stderr)
+            sys.exit(1)
+        except ValueError as e:
+            print(f"Error: Invalid config file: {e}", file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:
+            print(f"Error: Failed to load config file: {e}", file=sys.stderr)
+            sys.exit(1)
     elif not args.sources:
         default = find_default_config()
         if default:
             print(f"Using config file: {default}")
-            s, tz_str, cache_exp = load_config(default)
-            sources += s
+            try:
+                s, tz_str, cache_exp = load_config(default)
+                sources += s
+            except Exception as e:
+                print(f"Warning: Failed to load config file {default}: {e}", file=sys.stderr)
+
     if args.sources:
         sources += args.sources
 
     if not sources:
-        print("No calendar sources provided.", file=sys.stderr)
+        print("Error: No calendar sources provided.", file=sys.stderr)
+        print("Use --help for usage information.", file=sys.stderr)
         sys.exit(1)
 
     tz_str = args.timezone or tz_str
-    tz: Optional[timezone] = parse_timezone(tz_str) if tz_str else None
-    if tz_str and tz:
-        print(f"Using timezone: {tz_str}")
+    tz: Optional[timezone] = None
+    if tz_str:
+        try:
+            tz = parse_timezone(tz_str)
+            if tz:
+                print(f"Using timezone: {tz_str}")
+            else:
+                print(f"Warning: Could not parse timezone '{tz_str}', using local time", file=sys.stderr)
+        except Exception as e:
+            print(f"Warning: Invalid timezone '{tz_str}': {e}. Using local time.", file=sys.stderr)
 
-    manager: CalendarManager = CalendarManager(
-        target_timezone=tz, cache_expiration=cache_exp
-    )
-    manager.load_sources(sources)
-
-    if manager.count_events() == 0:
-        print("No events found.", file=sys.stderr)
+    try:
+        manager: CalendarManager = CalendarManager(
+            target_timezone=tz, cache_expiration=cache_exp
+        )
+        manager.load_sources(sources)
+    except Exception as e:
+        print(f"Error: Failed to load calendar sources: {e}", file=sys.stderr)
         sys.exit(1)
 
-    view: WeeklyView = WeeklyView(manager.get_all_events(), start, tz)
-    view.display()
+    if manager.count_events() == 0:
+        print("No events found in the calendar(s).", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        view: WeeklyView = WeeklyView(manager.get_all_events(), start, tz)
+        view.display()
+    except Exception as e:
+        print(f"Error: Failed to display calendar: {e}", file=sys.stderr)
+        sys.exit(1)

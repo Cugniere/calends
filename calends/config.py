@@ -70,21 +70,47 @@ def load_config(path: str) -> tuple[list[str], Optional[str], int]:
 
     Returns:
         Tuple of (calendar_sources, timezone_string, cache_expiration)
-        Returns empty values on error
+
+    Raises:
+        FileNotFoundError: If config file doesn't exist
+        PermissionError: If config file can't be read
+        ValueError: If config format is invalid
     """
     try:
         with open(path, encoding="utf-8") as f:
             cfg = json.load(f)
-        if not isinstance(cfg.get("calendars"), list):
-            raise ValueError("'calendars' must be a list")
+    except FileNotFoundError:
+        raise
+    except PermissionError:
+        raise
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON format: {e}")
+    except Exception as e:
+        raise ValueError(f"Failed to read config file: {e}")
 
-        calendars: list[str] = cfg["calendars"]
-        timezone_str: Optional[str] = cfg.get("timezone")
+    if not isinstance(cfg, dict):
+        raise ValueError("Config file must contain a JSON object")
+
+    if "calendars" not in cfg:
+        raise ValueError("Config file must contain 'calendars' field")
+
+    if not isinstance(cfg.get("calendars"), list):
+        raise ValueError("'calendars' must be a list")
+
+    calendars: list[str] = cfg["calendars"]
+
+    if not calendars:
+        raise ValueError("'calendars' list cannot be empty")
+
+    timezone_str: Optional[str] = cfg.get("timezone")
+
+    try:
         cache_expiration: int = int(
             cfg.get("cache_expiration", DEFAULT_CACHE_EXPIRATION_CONFIG)
         )
+        if cache_expiration < 0:
+            raise ValueError("'cache_expiration' must be non-negative")
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid 'cache_expiration' value: {e}")
 
-        return calendars, timezone_str, cache_expiration
-    except Exception as e:
-        print(f"Error loading config: {e}", file=sys.stderr)
-        return [], None, DEFAULT_CACHE_EXPIRATION_CONFIG
+    return calendars, timezone_str, cache_expiration

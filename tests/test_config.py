@@ -56,10 +56,8 @@ class TestLoadConfig:
         assert cache_exp == 60
 
     def test_load_nonexistent_config(self):
-        calendars, timezone_str, cache_exp = load_config(
-            "/nonexistent/path/config.json"
-        )
-        assert calendars == []
+        with pytest.raises(FileNotFoundError):
+            load_config("/nonexistent/path/config.json")
 
 
 class TestFindDefaultConfig:

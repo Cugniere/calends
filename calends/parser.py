@@ -1,6 +1,7 @@
 """Pure iCal parsing logic without I/O or state management."""
 
 import re
+import sys
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
 from .constants import (
@@ -43,20 +44,32 @@ class ICalParser:
 
         Returns:
             List of unfolded lines
+
+        Raises:
+            ValueError: If content is not a string
         """
-        lines = content.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-        unfolded: list[str] = []
-        current = ""
-        for line in lines:
-            if line and line[0] in (" ", "\t"):
-                current += line[1:]
-            else:
-                if current:
-                    unfolded.append(current)
-                current = line
-        if current:
-            unfolded.append(current)
-        return unfolded
+        if not isinstance(content, str):
+            raise ValueError("Content must be a string")
+
+        if not content.strip():
+            return []
+
+        try:
+            lines = content.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+            unfolded: list[str] = []
+            current = ""
+            for line in lines:
+                if line and line[0] in (" ", "\t"):
+                    current += line[1:]
+                else:
+                    if current:
+                        unfolded.append(current)
+                    current = line
+            if current:
+                unfolded.append(current)
+            return unfolded
+        except Exception as e:
+            raise ValueError(f"Failed to unfold lines: {e}")
 
     def parse_datetime(self, dt_string: str) -> Optional[datetime]:
         """
@@ -73,31 +86,43 @@ class ICalParser:
         Returns:
             Parsed datetime object, or None if parsing fails
         """
-        if not dt_string:
+        if not dt_string or not isinstance(dt_string, str):
             return None
-        if ";" in dt_string or ":" in dt_string:
-            dt_string = dt_string.split(":")[-1]
-        formats: list[tuple[str, bool]] = [
-            ("%Y%m%dT%H%M%SZ", True),
-            ("%Y%m%dT%H%M%S", False),
-            ("%Y%m%d", False),
-        ]
-        dt: Optional[datetime] = None
-        is_utc = False
-        for fmt, utc_flag in formats:
-            try:
-                dt = datetime.strptime(dt_string, fmt)
-                is_utc = utc_flag
-                break
-            except ValueError:
-                continue
-        if not dt:
+
+        try:
+            dt_string = dt_string.strip()
+            if ";" in dt_string or ":" in dt_string:
+                dt_string = dt_string.split(":")[-1]
+
+            if not dt_string:
+                return None
+
+            formats: list[tuple[str, bool]] = [
+                ("%Y%m%dT%H%M%SZ", True),
+                ("%Y%m%dT%H%M%S", False),
+                ("%Y%m%d", False),
+            ]
+            dt: Optional[datetime] = None
+            is_utc = False
+            for fmt, utc_flag in formats:
+                try:
+                    dt = datetime.strptime(dt_string, fmt)
+                    is_utc = utc_flag
+                    break
+                except ValueError:
+                    continue
+
+            if not dt:
+                return None
+
+            if is_utc:
+                dt = dt.replace(tzinfo=timezone.utc)
+            if self.target_timezone and dt.tzinfo:
+                dt = dt.astimezone(self.target_timezone)
+            return dt
+        except Exception as e:
+            print(f"Warning: Failed to parse datetime '{dt_string}': {e}", file=sys.stderr)
             return None
-        if is_utc:
-            dt = dt.replace(tzinfo=timezone.utc)
-        if self.target_timezone and dt.tzinfo:
-            dt = dt.astimezone(self.target_timezone)
-        return dt
 
     def parse_rrule(self, rrule_line: str) -> Optional[dict[str, str]]:
         """
@@ -187,57 +212,84 @@ class ICalParser:
         if not rrule or not event["start"]:
             return [event]
 
-        freq = rrule.get("FREQ")
-        count = int(rrule.get("COUNT", max_instances))
-        until = rrule.get("UNTIL")
-        interval = int(rrule.get("INTERVAL", 1))
+        try:
+            freq = rrule.get("FREQ")
+            if not freq or freq not in ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]:
+                print(f"Warning: Unsupported or missing FREQ in RRULE: {freq}", file=sys.stderr)
+                return [event]
 
-        until_dt: Optional[datetime] = None
-        if until:
-            until_dt = self.parse_datetime(until)
+            try:
+                count = int(rrule.get("COUNT", max_instances))
+                if count <= 0:
+                    count = max_instances
+            except (ValueError, TypeError):
+                print(f"Warning: Invalid COUNT in RRULE, using default", file=sys.stderr)
+                count = max_instances
 
-        instances: list[EventDict] = []
-        current_start: datetime = event["start"]
-        duration: timedelta = (
-            event["end"] - event["start"]
-            if event["end"]
-            else timedelta(hours=DEFAULT_EVENT_DURATION_HOURS)
-        )
+            try:
+                interval = int(rrule.get("INTERVAL", 1))
+                if interval <= 0:
+                    interval = 1
+            except (ValueError, TypeError):
+                print(f"Warning: Invalid INTERVAL in RRULE, using 1", file=sys.stderr)
+                interval = 1
 
-        for i in range(count):
-            if until_dt and current_start > until_dt:
-                break
+            until = rrule.get("UNTIL")
+            until_dt: Optional[datetime] = None
+            if until:
+                until_dt = self.parse_datetime(until)
 
-            instance = event.copy()
-            instance["start"] = current_start
-            instance["end"] = current_start + duration
-            instances.append(instance)
+            instances: list[EventDict] = []
+            current_start: datetime = event["start"]
+            duration: timedelta = (
+                event["end"] - event["start"]
+                if event["end"]
+                else timedelta(hours=DEFAULT_EVENT_DURATION_HOURS)
+            )
 
-            if freq == "DAILY":
-                current_start += timedelta(days=interval)
-            elif freq == "WEEKLY":
-                current_start += timedelta(weeks=interval)
-            elif freq == "MONTHLY":
-                month = current_start.month + interval
-                year = current_start.year + (month - 1) // 12
-                month = ((month - 1) % 12) + 1
+            for i in range(min(count, max_instances)):
+                if until_dt and current_start > until_dt:
+                    break
+
+                instance = event.copy()
+                instance["start"] = current_start
+                instance["end"] = current_start + duration
+                instances.append(instance)
+
                 try:
-                    current_start = current_start.replace(year=year, month=month)
-                except ValueError:
-                    import calendar
+                    if freq == "DAILY":
+                        current_start += timedelta(days=interval)
+                    elif freq == "WEEKLY":
+                        current_start += timedelta(weeks=interval)
+                    elif freq == "MONTHLY":
+                        month = current_start.month + interval
+                        year = current_start.year + (month - 1) // 12
+                        month = ((month - 1) % 12) + 1
+                        try:
+                            current_start = current_start.replace(year=year, month=month)
+                        except ValueError:
+                            import calendar
+                            last_day = calendar.monthrange(year, month)[1]
+                            current_start = current_start.replace(
+                                year=year, month=month, day=last_day
+                            )
+                    elif freq == "YEARLY":
+                        try:
+                            current_start = current_start.replace(
+                                year=current_start.year + interval
+                            )
+                        except ValueError:
+                            current_start = current_start.replace(
+                                year=current_start.year + interval, day=28
+                            )
+                except (ValueError, OverflowError) as e:
+                    print(f"Warning: Failed to generate recurrence instance: {e}", file=sys.stderr)
+                    break
 
-                    last_day = calendar.monthrange(year, month)[1]
-                    current_start = current_start.replace(
-                        year=year, month=month, day=last_day
-                    )
-            elif freq == "YEARLY":
-                current_start = current_start.replace(
-                    year=current_start.year + interval
-                )
-            else:
-                break
-
-        return instances
+            return instances
+        except Exception as e:
+            print(f"Warning: Failed to expand recurring event: {e}", file=sys.stderr)
+            return [event]
 
     def parse_ical_content(self, content: str) -> list[EventDict]:
         """
@@ -248,28 +300,50 @@ class ICalParser:
 
         Returns:
             List of parsed and expanded event dictionaries
+
+        Raises:
+            ValueError: If content is invalid or not iCal format
         """
-        lines = self.unfold_lines(content)
-        events: list[EventDict] = []
-        in_event = False
-        event_lines: list[str] = []
+        if not content or not isinstance(content, str):
+            raise ValueError("Content must be a non-empty string")
 
-        for line in lines:
-            if line == "BEGIN:VEVENT":
-                in_event, event_lines = True, []
-            elif line == "END:VEVENT":
-                if event_lines:
-                    event = self.parse_event(event_lines)
-                    if event["start"]:
-                        if event.get("rrule"):
-                            instances = self.expand_recurring_event(
-                                event, event["rrule"]
-                            )
-                            events.extend(instances)
-                        else:
-                            events.append(event)
-                in_event = False
-            elif in_event:
-                event_lines.append(line)
+        if "BEGIN:VCALENDAR" not in content:
+            raise ValueError("Content does not contain BEGIN:VCALENDAR - not valid iCal format")
 
-        return events
+        try:
+            lines = self.unfold_lines(content)
+            events: list[EventDict] = []
+            in_event = False
+            event_lines: list[str] = []
+
+            for line in lines:
+                if line == "BEGIN:VEVENT":
+                    in_event, event_lines = True, []
+                elif line == "END:VEVENT":
+                    if event_lines:
+                        try:
+                            event = self.parse_event(event_lines)
+                            if event["start"]:
+                                if event.get("rrule"):
+                                    instances = self.expand_recurring_event(
+                                        event, event["rrule"]
+                                    )
+                                    events.extend(instances)
+                                else:
+                                    events.append(event)
+                            else:
+                                print(f"Warning: Skipping event without start time: {event.get('summary', 'Untitled')}", file=sys.stderr)
+                        except Exception as e:
+                            print(f"Warning: Failed to parse event: {e}", file=sys.stderr)
+                    in_event = False
+                elif in_event:
+                    event_lines.append(line)
+
+            if in_event:
+                print("Warning: Unclosed VEVENT block at end of file", file=sys.stderr)
+
+            return events
+        except ValueError:
+            raise
+        except Exception as e:
+            raise ValueError(f"Failed to parse iCal content: {e}")

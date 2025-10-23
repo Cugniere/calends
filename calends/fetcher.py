@@ -36,24 +36,58 @@ class ICalFetcher:
             The iCal content as a string
 
         Raises:
-            Exception: If fetching fails due to HTTP or network errors
+            ValueError: If URL is invalid
+            TimeoutError: If request times out
+            ConnectionError: If network connection fails
+            Exception: For other HTTP or network errors
         """
+        if not url or not (url.startswith("http://") or url.startswith("https://")):
+            raise ValueError(f"Invalid URL: {url}")
+
         cached = self.cache.get(url)
         if cached:
             return cached
 
         try:
-            req = Request(url, headers={"User-Agent": "iCal-Viewer/1.0"})
+            req = Request(url, headers={"User-Agent": "calends/1.0"})
             with urlopen(req, timeout=URL_FETCH_TIMEOUT) as response:
+                if response.status != 200:
+                    raise Exception(f"HTTP {response.status}: Unexpected response")
+
                 content = response.read().decode("utf-8")
+
+                if not content.strip():
+                    raise ValueError(f"Empty response from {url}")
+
+                if "BEGIN:VCALENDAR" not in content:
+                    raise ValueError(f"Response does not appear to be valid iCal format")
+
                 self.cache.set(url, content)
                 return content
         except HTTPError as e:
-            raise Exception(f"HTTP Error {e.code}: {e.reason}")
+            if e.code == 404:
+                raise Exception(f"Calendar not found (404): {url}")
+            elif e.code == 403:
+                raise Exception(f"Access forbidden (403): {url}")
+            elif e.code == 401:
+                raise Exception(f"Authentication required (401): {url}")
+            else:
+                raise Exception(f"HTTP Error {e.code}: {e.reason}")
         except URLError as e:
-            raise Exception(f"URL Error: {e.reason}")
+            if "timed out" in str(e.reason).lower():
+                raise TimeoutError(f"Request timed out after {URL_FETCH_TIMEOUT}s: {url}")
+            else:
+                raise ConnectionError(f"Network error: {e.reason}")
+        except UnicodeDecodeError as e:
+            raise Exception(f"Invalid text encoding in response: {e}")
+        except TimeoutError:
+            raise
+        except ValueError:
+            raise
+        except ConnectionError:
+            raise
         except Exception as e:
-            raise Exception(f"Failed to fetch URL: {str(e)}")
+            raise Exception(f"Failed to fetch {url}: {str(e)}")
 
     def fetch(self, source: str) -> Optional[str]:
         """
@@ -65,12 +99,39 @@ class ICalFetcher:
         Returns:
             The iCal content as a string, or None if fetching fails
         """
+        if not source or not source.strip():
+            print("Error: Empty source provided", file=sys.stderr)
+            return None
+
         try:
             if source.startswith("http://") or source.startswith("https://"):
                 return self.fetch_from_url(source)
             else:
-                with open(source, "r", encoding="utf-8") as f:
-                    return f.read()
+                try:
+                    with open(source, "r", encoding="utf-8") as f:
+                        content = f.read()
+
+                    if not content.strip():
+                        print(f"Error: File is empty: {source}", file=sys.stderr)
+                        return None
+
+                    if "BEGIN:VCALENDAR" not in content:
+                        print(f"Error: File does not appear to be valid iCal format: {source}", file=sys.stderr)
+                        return None
+
+                    return content
+                except FileNotFoundError:
+                    print(f"Error: File not found: {source}", file=sys.stderr)
+                    return None
+                except PermissionError:
+                    print(f"Error: Permission denied: {source}", file=sys.stderr)
+                    return None
+                except UnicodeDecodeError:
+                    print(f"Error: File is not valid UTF-8 text: {source}", file=sys.stderr)
+                    return None
+                except IsADirectoryError:
+                    print(f"Error: Path is a directory, not a file: {source}", file=sys.stderr)
+                    return None
         except Exception as e:
             print(f"Error reading {source}: {e}", file=sys.stderr)
             return None
