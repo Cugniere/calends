@@ -15,6 +15,8 @@ class Colors:
 
     LIGHT_GREY = '\033[37m'
 
+    BG_RED = '\033[48;5;167m'
+
     @staticmethod
     def disable():
         """Disable colors (for piping or when colors not supported)."""

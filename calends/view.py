@@ -51,10 +51,30 @@ class WeeklyView:
                 for e in week[key]:
                     start, end = self.format_time(e['start']), self.format_time(e['end'])
                     time_range = f"{start} - {end}" if start != end else "All day"
-                    color = Colors.DIM if e['end'] < now else Colors.BLUE
-                    print(f"{color}  {time_range:<15}{Colors.RESET if not is_past else ''}{e['summary']}{Colors.RESET}")
-                    if e['location']:
-                        print(f"{Colors.CYAN}                   ⚲ {self.truncate(e['location'],60)}{Colors.RESET}")
+                    
+                    # Check if event is currently ongoing
+                    is_ongoing = e['start'] <= now < e['end']
+                    
+                    # Set background and text color
+                    if is_ongoing:
+                        bg_color = Colors.BG_RED
+                        text_color = Colors.BOLD
+                        # Build the line and pad to 80 chars
+                        line = f"  {time_range:<15}{e['summary']}"
+                        line = line.ljust(80)
+                        print(f"{bg_color}{text_color}{line}{Colors.RESET}")
+                        if e['location']:
+                            loc_line = f"                   ⚲ {self.truncate(e['location'],60)}"
+                            loc_line = loc_line.ljust(80)
+                            print(f"{bg_color}{Colors.CYAN}{loc_line}{Colors.RESET}")
+                    elif e['end'] < now:
+                        print(f"{Colors.DIM}  {time_range:<15}{Colors.RESET}{e['summary']}{Colors.RESET}")
+                        if e['location']:
+                            print(f"{Colors.CYAN}                   ⚲ {self.truncate(e['location'],60)}{Colors.RESET}")
+                    else:
+                        print(f"{Colors.BLUE}  {time_range:<15}{Colors.RESET}{e['summary']}{Colors.RESET}")
+                        if e['location']:
+                            print(f"{Colors.CYAN}                   ⚲ {self.truncate(e['location'],60)}{Colors.RESET}")
             else:
                 print(f"{Colors.DIM}  No events{Colors.RESET}")
         total = sum(len(v) for v in week.values())
