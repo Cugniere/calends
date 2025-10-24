@@ -6,6 +6,7 @@ from urllib.error import URLError, HTTPError
 from typing import Optional
 from .cache import Cache
 from .constants import DEFAULT_CACHE_EXPIRATION, URL_FETCH_TIMEOUT
+from .colors import Colors
 
 
 class ICalFetcher:
@@ -16,14 +17,20 @@ class ICalFetcher:
         cache: Cache instance for storing fetched content
     """
 
-    def __init__(self, cache_expiration: int = DEFAULT_CACHE_EXPIRATION) -> None:
+    def __init__(
+        self,
+        cache_expiration: int = DEFAULT_CACHE_EXPIRATION,
+        show_progress: bool = True,
+    ) -> None:
         """
         Initialize the fetcher with cache.
 
         Args:
             cache_expiration: Cache expiration time in seconds
+            show_progress: Whether to show progress indicators
         """
         self.cache: Cache = Cache(expiration_seconds=cache_expiration)
+        self.show_progress: bool = show_progress
 
     def fetch_from_url(self, url: str) -> str:
         """
@@ -46,7 +53,12 @@ class ICalFetcher:
 
         cached = self.cache.get(url)
         if cached:
+            if self.show_progress:
+                print(f"{Colors.DIM}  (cached){Colors.RESET}", file=sys.stderr)
             return cached
+
+        if self.show_progress:
+            print(f"{Colors.BLUE}Fetching {url}...{Colors.RESET}", end="", file=sys.stderr, flush=True)
 
         try:
             req = Request(url, headers={"User-Agent": "calends/1.0"})
@@ -63,8 +75,11 @@ class ICalFetcher:
                     raise ValueError(f"Response does not appear to be valid iCal format")
 
                 self.cache.set(url, content)
+
                 return content
         except HTTPError as e:
+            if self.show_progress:
+                print(f" {Colors.RED}✗{Colors.RESET}", file=sys.stderr)
             if e.code == 404:
                 raise Exception(f"Calendar not found (404): {url}")
             elif e.code == 403:
@@ -74,19 +89,31 @@ class ICalFetcher:
             else:
                 raise Exception(f"HTTP Error {e.code}: {e.reason}")
         except URLError as e:
+            if self.show_progress:
+                print(f" {Colors.RED}✗{Colors.RESET}", file=sys.stderr)
             if "timed out" in str(e.reason).lower():
                 raise TimeoutError(f"Request timed out after {URL_FETCH_TIMEOUT}s: {url}")
             else:
                 raise ConnectionError(f"Network error: {e.reason}")
         except UnicodeDecodeError as e:
+            if self.show_progress:
+                print(f" {Colors.RED}✗{Colors.RESET}", file=sys.stderr)
             raise Exception(f"Invalid text encoding in response: {e}")
         except TimeoutError:
+            if self.show_progress:
+                print(f" {Colors.RED}✗{Colors.RESET}", file=sys.stderr)
             raise
         except ValueError:
+            if self.show_progress:
+                print(f" {Colors.RED}✗{Colors.RESET}", file=sys.stderr)
             raise
         except ConnectionError:
+            if self.show_progress:
+                print(f" {Colors.RED}✗{Colors.RESET}", file=sys.stderr)
             raise
         except Exception as e:
+            if self.show_progress:
+                print(f" {Colors.RED}✗{Colors.RESET}", file=sys.stderr)
             raise Exception(f"Failed to fetch {url}: {str(e)}")
 
     def fetch(self, source: str) -> Optional[str]:

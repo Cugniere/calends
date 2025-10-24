@@ -67,6 +67,11 @@ For more information, visit: https://github.com/anthropics/claude-code
         action="store_true",
         help="Disable colored output (useful for non-interactive terminals or piping).",
     )
+    parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable progress indicators during calendar loading.",
+    )
     args = parser.parse_args()
 
     if args.no_color or not sys.stdout.isatty():
@@ -134,9 +139,13 @@ For more information, visit: https://github.com/anthropics/claude-code
         except Exception as e:
             print(f"Warning: Invalid timezone '{tz_str}': {e}. Using local time.", file=sys.stderr)
 
+    show_progress = not args.no_progress and sys.stderr.isatty()
+
     try:
         manager: CalendarManager = CalendarManager(
-            target_timezone=tz, cache_expiration=cache_exp
+            target_timezone=tz,
+            cache_expiration=cache_exp,
+            show_progress=show_progress,
         )
         manager.load_sources(sources)
     except Exception as e:

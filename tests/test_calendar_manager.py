@@ -5,26 +5,26 @@ from calends.calendar_manager import CalendarManager
 
 class TestCalendarManager:
     def test_init_default(self):
-        manager = CalendarManager()
+        manager = CalendarManager(show_progress=False)
         assert manager.parser is not None
         assert manager.fetcher is not None
         assert manager.events is not None
 
     def test_init_with_timezone(self):
         tz = timezone.utc
-        manager = CalendarManager(target_timezone=tz)
+        manager = CalendarManager(target_timezone=tz, show_progress=False)
         assert manager.parser.target_timezone == tz
 
     def test_init_with_cache_expiration(self):
-        manager = CalendarManager(cache_expiration=300)
+        manager = CalendarManager(cache_expiration=300, show_progress=False)
         assert manager.fetcher.cache.expiration == 300
 
     def test_count_events_empty(self):
-        manager = CalendarManager()
+        manager = CalendarManager(show_progress=False)
         assert manager.count_events() == 0
 
     def test_get_all_events_empty(self):
-        manager = CalendarManager()
+        manager = CalendarManager(show_progress=False)
         assert manager.get_all_events() == []
 
 
@@ -46,7 +46,7 @@ END:VCALENDAR"""
         test_file = tmp_path / "calendar.ics"
         test_file.write_text(ical_content)
 
-        manager = CalendarManager()
+        manager = CalendarManager(show_progress=False)
         manager.load_source(str(test_file))
 
         assert manager.count_events() == 1
@@ -69,7 +69,7 @@ END:VCALENDAR"""
         test_file = tmp_path / "recurring.ics"
         test_file.write_text(ical_content)
 
-        manager = CalendarManager()
+        manager = CalendarManager(show_progress=False)
         manager.load_source(str(test_file))
 
         assert manager.count_events() == 3
@@ -89,13 +89,13 @@ END:VCALENDAR"""
         test_file = tmp_path / "multiday.ics"
         test_file.write_text(ical_content)
 
-        manager = CalendarManager()
+        manager = CalendarManager(show_progress=False)
         manager.load_source(str(test_file))
 
         assert manager.count_events() == 2
 
     def test_load_source_nonexistent_file(self, capsys):
-        manager = CalendarManager()
+        manager = CalendarManager(show_progress=False)
         manager.load_source("/nonexistent/calendar.ics")
 
         assert manager.count_events() == 0
@@ -106,7 +106,7 @@ END:VCALENDAR"""
         test_file = tmp_path / "invalid.ics"
         test_file.write_text("This is not iCal content")
 
-        manager = CalendarManager()
+        manager = CalendarManager(show_progress=False)
         manager.load_source(str(test_file))
 
         assert manager.count_events() == 0
@@ -141,7 +141,7 @@ END:VCALENDAR"""
         file1.write_text(ical1)
         file2.write_text(ical2)
 
-        manager = CalendarManager()
+        manager = CalendarManager(show_progress=False)
         manager.load_sources([str(file1), str(file2)])
 
         assert manager.count_events() == 2
@@ -150,7 +150,7 @@ END:VCALENDAR"""
         assert summaries == {"Event 1", "Event 2"}
 
     def test_load_sources_empty_list(self):
-        manager = CalendarManager()
+        manager = CalendarManager(show_progress=False)
         manager.load_sources([])
 
         assert manager.count_events() == 0
@@ -169,7 +169,7 @@ END:VCALENDAR"""
         valid_file = tmp_path / "valid.ics"
         valid_file.write_text(ical_valid)
 
-        manager = CalendarManager()
+        manager = CalendarManager(show_progress=False)
         manager.load_sources([str(valid_file), "/nonexistent/invalid.ics"])
 
         assert manager.count_events() == 1
@@ -252,7 +252,7 @@ END:VCALENDAR"""
         file1.write_text(ical1)
         file2.write_text(ical2)
 
-        manager = CalendarManager()
+        manager = CalendarManager(show_progress=False)
         manager.load_source(str(file1))
         assert manager.count_events() == 1
 
@@ -273,7 +273,7 @@ END:VCALENDAR"""
         test_file = tmp_path / "calendar.ics"
         test_file.write_text(ical_content)
 
-        manager = CalendarManager()
+        manager = CalendarManager(show_progress=False)
         manager.load_source(str(test_file))
 
         events = manager.get_all_events()

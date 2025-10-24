@@ -13,27 +13,27 @@ def cleanup_cache():
 
 class TestICalFetcher:
     def test_init_default_expiration(self):
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         assert fetcher.cache is not None
 
     def test_init_custom_expiration(self):
-        fetcher = ICalFetcher(cache_expiration=300)
+        fetcher = ICalFetcher(cache_expiration=300, show_progress=False)
         assert fetcher.cache.expiration == 300
 
 
 class TestFetchFromUrl:
     def test_invalid_url_empty(self):
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         with pytest.raises(ValueError, match="Invalid URL"):
             fetcher.fetch_from_url("")
 
     def test_invalid_url_no_protocol(self):
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         with pytest.raises(ValueError, match="Invalid URL"):
             fetcher.fetch_from_url("example.com/calendar.ics")
 
     def test_invalid_url_wrong_protocol(self):
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         with pytest.raises(ValueError, match="Invalid URL"):
             fetcher.fetch_from_url("ftp://example.com/calendar.ics")
 
@@ -53,7 +53,7 @@ END:VCALENDAR"""
         mock_response.__exit__ = Mock(return_value=False)
         mock_urlopen.return_value = mock_response
 
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         result = fetcher.fetch_from_url("https://example.com/calendar.ics")
 
         assert result == ical_content
@@ -72,7 +72,7 @@ END:VCALENDAR"""
         mock_response.__exit__ = Mock(return_value=False)
         mock_urlopen.return_value = mock_response
 
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         url = "https://example.com/cache-test-calendar.ics"
 
         result1 = fetcher.fetch_from_url(url)
@@ -90,7 +90,7 @@ END:VCALENDAR"""
         mock_response.__exit__ = Mock(return_value=False)
         mock_urlopen.return_value = mock_response
 
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         with pytest.raises(ValueError, match="Empty response"):
             fetcher.fetch_from_url("https://example.com/empty-test.ics")
 
@@ -103,7 +103,7 @@ END:VCALENDAR"""
         mock_response.__exit__ = Mock(return_value=False)
         mock_urlopen.return_value = mock_response
 
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         with pytest.raises(ValueError, match="does not appear to be valid iCal format"):
             fetcher.fetch_from_url("https://example.com/invalid-test.ics")
 
@@ -115,7 +115,7 @@ END:VCALENDAR"""
             "https://example.com/404-test.ics", 404, "Not Found", {}, None
         )
 
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         with pytest.raises(Exception, match="not found \\(404\\)"):
             fetcher.fetch_from_url("https://example.com/404-test.ics")
 
@@ -127,7 +127,7 @@ END:VCALENDAR"""
             "https://example.com/403-test.ics", 403, "Forbidden", {}, None
         )
 
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         with pytest.raises(Exception, match="forbidden \\(403\\)"):
             fetcher.fetch_from_url("https://example.com/403-test.ics")
 
@@ -139,7 +139,7 @@ END:VCALENDAR"""
             "https://example.com/401-test.ics", 401, "Unauthorized", {}, None
         )
 
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         with pytest.raises(Exception, match="Authentication required \\(401\\)"):
             fetcher.fetch_from_url("https://example.com/401-test.ics")
 
@@ -149,14 +149,14 @@ END:VCALENDAR"""
 
         mock_urlopen.side_effect = URLError("Network unreachable")
 
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         with pytest.raises(ConnectionError, match="Network error"):
             fetcher.fetch_from_url("https://example.com/connection-test.ics")
 
 
 class TestFetch:
     def test_fetch_empty_source(self, capsys):
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         result = fetcher.fetch("")
 
         assert result is None
@@ -164,7 +164,7 @@ class TestFetch:
         assert "Empty source" in captured.err
 
     def test_fetch_whitespace_source(self, capsys):
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         result = fetcher.fetch("   ")
 
         assert result is None
@@ -182,13 +182,13 @@ END:VCALENDAR"""
         test_file = tmp_path / "calendar.ics"
         test_file.write_text(ical_content)
 
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         result = fetcher.fetch(str(test_file))
 
         assert result == ical_content
 
     def test_fetch_file_not_found(self, capsys):
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         result = fetcher.fetch("/nonexistent/path/calendar.ics")
 
         assert result is None
@@ -199,7 +199,7 @@ END:VCALENDAR"""
         test_file = tmp_path / "empty.ics"
         test_file.write_text("")
 
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         result = fetcher.fetch(str(test_file))
 
         assert result is None
@@ -210,7 +210,7 @@ END:VCALENDAR"""
         test_file = tmp_path / "invalid.ics"
         test_file.write_text("This is not iCal content")
 
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         result = fetcher.fetch(str(test_file))
 
         assert result is None
@@ -218,7 +218,7 @@ END:VCALENDAR"""
         assert "does not appear to be valid iCal format" in captured.err
 
     def test_fetch_directory(self, tmp_path, capsys):
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         result = fetcher.fetch(str(tmp_path))
 
         assert result is None
@@ -238,7 +238,7 @@ END:VCALENDAR"""
         mock_response.__exit__ = Mock(return_value=False)
         mock_urlopen.return_value = mock_response
 
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         result = fetcher.fetch("https://example.com/fetch-url-success-test.ics")
 
         assert result == ical_content
@@ -256,7 +256,7 @@ END:VCALENDAR"""
         mock_response.__exit__ = Mock(return_value=False)
         mock_urlopen.return_value = mock_response
 
-        fetcher = ICalFetcher()
+        fetcher = ICalFetcher(show_progress=False)
         result = fetcher.fetch("http://example.com/calendar.ics")
 
         assert result == ical_content
