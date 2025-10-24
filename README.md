@@ -29,6 +29,10 @@ calends -d 2025-12-25 calendar.ics
 # Use specific timezone
 calends -tz UTC calendar.ics
 calends -tz +05:30 calendar.ics
+
+# Cache management
+calends --cache-info        # Show cache statistics
+calends --clear-cache       # Clear the cache
 ```
 
 ## Configuration
@@ -55,6 +59,8 @@ Create `calendars.json` or `calends.json`:
 - `-i, --interactive`: Interactive mode for week navigation
 - `--no-color`: Disable colors
 - `--no-progress`: Disable progress indicators
+- `--cache-info`: Display cache statistics
+- `--clear-cache`: Clear the calendar cache
 
 ## Features
 
@@ -63,7 +69,8 @@ Create `calendars.json` or `calends.json`:
 - Support for recurring events (RRULE)
 - Multi-day event expansion
 - Timezone conversion
-- URL caching with progress indicators
+- **Smart URL caching** with manual cache management (--cache-info, --clear-cache)
+- Progress indicators for slow network operations
 - Color-coded display (ongoing/past/future events)
 
 ## Testing

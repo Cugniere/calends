@@ -79,10 +79,43 @@ For more information, visit: https://github.com/anthropics/claude-code
         action="store_true",
         help="Enable interactive mode for navigating between weeks.",
     )
+    parser.add_argument(
+        "--clear-cache",
+        action="store_true",
+        help="Clear the calendar cache and exit.",
+    )
+    parser.add_argument(
+        "--cache-info",
+        action="store_true",
+        help="Display cache information and exit.",
+    )
     args = parser.parse_args()
 
     if args.no_color or not sys.stdout.isatty():
         Colors.disable()
+
+    # Handle cache management commands
+    if args.clear_cache:
+        from .cache import Cache
+        cache = Cache()
+        cache.clear()
+        print(f"{Colors.GREEN}✓{Colors.RESET} Cache cleared successfully")
+        print(f"  Cache file: {cache.path}")
+        sys.exit(0)
+
+    if args.cache_info:
+        from .cache import Cache
+        cache = Cache()
+        stats = cache.get_stats()
+        print(f"{Colors.BOLD}Cache Information:{Colors.RESET}")
+        print(f"  Location: {stats['cache_path']}")
+        print(f"  Exists: {Colors.GREEN if stats['cache_file_exists'] else Colors.RED}{stats['cache_file_exists']}{Colors.RESET}")
+        print(f"  Total entries: {stats['total_entries']}")
+        print(f"  Valid entries: {Colors.CYAN}{stats['valid_entries']}{Colors.RESET}")
+        if stats['total_entries'] > stats['valid_entries']:
+            expired = stats['total_entries'] - stats['valid_entries']
+            print(f"  Expired entries: {Colors.DIM}{expired}{Colors.RESET}")
+        sys.exit(0)
 
     start: Optional[datetime] = None
     if args.date:
