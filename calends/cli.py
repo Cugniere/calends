@@ -23,6 +23,7 @@ Examples:
   %(prog)s -d 2025-12-25                         # View specific week (auto-adjusts to Monday)
   %(prog)s -tz UTC calendar.ics                  # View in specific timezone
   %(prog)s -tz +05:30 calendar.ics               # View with UTC offset
+  %(prog)s -i calendar.ics                       # Interactive mode (navigate with arrow keys)
 
 Config file format (calendars.json or calends.json):
   {
@@ -71,6 +72,12 @@ For more information, visit: https://github.com/anthropics/claude-code
         "--no-progress",
         action="store_true",
         help="Disable progress indicators during calendar loading.",
+    )
+    parser.add_argument(
+        "-i",
+        "--interactive",
+        action="store_true",
+        help="Enable interactive mode for navigating between weeks.",
     )
     args = parser.parse_args()
 
@@ -158,7 +165,10 @@ For more information, visit: https://github.com/anthropics/claude-code
 
     try:
         view: WeeklyView = WeeklyView(manager.get_all_events(), start, tz)
-        view.display()
+        if args.interactive:
+            view.display_interactive()
+        else:
+            view.display()
     except Exception as e:
         print(f"Error: Failed to display calendar: {e}", file=sys.stderr)
         sys.exit(1)

@@ -17,6 +17,9 @@ calends calendar.ics
 # View remote calendar
 calends https://example.com/calendar.ics
 
+# Interactive mode (navigate with arrow keys)
+calends -i calendar.ics
+
 # Use config file (calendars.json or calends.json auto-detected)
 calends -c config.json
 
@@ -49,15 +52,18 @@ Create `calendars.json` or `calends.json`:
 - `-c, --config FILE`: Config file path
 - `-d, --date YYYY-MM-DD`: Start date (adjusts to Monday)
 - `-tz, --timezone TZ`: Timezone (UTC, LOCAL, or offset like +05:30)
+- `-i, --interactive`: Interactive mode for week navigation
 - `--no-color`: Disable colors
+- `--no-progress`: Disable progress indicators
 
 ## Features
 
 - Weekly calendar view
+- **Interactive navigation** (arrow keys, n/p for next/previous week, t for today, j to jump to date)
 - Support for recurring events (RRULE)
 - Multi-day event expansion
 - Timezone conversion
-- URL caching
+- URL caching with progress indicators
 - Color-coded display (ongoing/past/future events)
 
 ## Testing
