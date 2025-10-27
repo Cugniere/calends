@@ -132,3 +132,75 @@ class TestCacheManagement:
 
         assert cache.size() == 0
         assert not cache_path.exists()
+
+
+class TestCacheMetadata:
+    """Test cache metadata and change detection."""
+
+    def test_set_with_metadata(self, temp_cache_dir):
+        """Test storing content with metadata."""
+        cache_path = temp_cache_dir / "metadata_test.pkl"
+        cache = Cache(path=str(cache_path))
+        content = "test content"
+        metadata = {"etag": '"abc123"', "last_modified": "Wed, 21 Oct 2015 07:28:00 GMT"}
+
+        cache.set("test_key", content, metadata)
+
+        stored_metadata = cache.get_metadata("test_key")
+        assert stored_metadata is not None
+        assert stored_metadata["etag"] == '"abc123"'
+        assert stored_metadata["last_modified"] == "Wed, 21 Oct 2015 07:28:00 GMT"
+
+    def test_get_content_hash(self, temp_cache_dir):
+        """Test content hash generation and retrieval."""
+        cache_path = temp_cache_dir / "hash_test.pkl"
+        cache = Cache(path=str(cache_path))
+        content = "test content for hashing"
+
+        cache.set("test_key", content)
+
+        content_hash = cache.get_content_hash("test_key")
+        assert content_hash is not None
+        assert len(content_hash) == 64  # SHA256 hex digest length
+
+    def test_has_changed_same_content(self, temp_cache_dir):
+        """Test has_changed returns False for identical content."""
+        cache_path = temp_cache_dir / "unchanged_test.pkl"
+        cache = Cache(path=str(cache_path))
+        content = "unchanged content"
+
+        cache.set("test_key", content)
+
+        assert not cache.has_changed("test_key", content)
+
+    def test_has_changed_different_content(self, temp_cache_dir):
+        """Test has_changed returns True for modified content."""
+        cache_path = temp_cache_dir / "changed_test.pkl"
+        cache = Cache(path=str(cache_path))
+        original = "original content"
+        modified = "modified content"
+
+        cache.set("test_key", original)
+
+        assert cache.has_changed("test_key", modified)
+
+    def test_has_changed_no_cache(self, temp_cache_dir):
+        """Test has_changed returns True when no cache exists."""
+        cache_path = temp_cache_dir / "nocache_test.pkl"
+        cache = Cache(path=str(cache_path))
+
+        assert cache.has_changed("nonexistent_key", "any content")
+
+    def test_get_metadata_nonexistent(self, temp_cache_dir):
+        """Test get_metadata returns None for nonexistent key."""
+        cache_path = temp_cache_dir / "nometa_test.pkl"
+        cache = Cache(path=str(cache_path))
+
+        assert cache.get_metadata("nonexistent_key") is None
+
+    def test_get_content_hash_nonexistent(self, temp_cache_dir):
+        """Test get_content_hash returns None for nonexistent key."""
+        cache_path = temp_cache_dir / "nohash_test.pkl"
+        cache = Cache(path=str(cache_path))
+
+        assert cache.get_content_hash("nonexistent_key") is None

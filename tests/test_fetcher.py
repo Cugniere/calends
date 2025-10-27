@@ -414,3 +414,145 @@ class TestFetchMultiple:
 
         assert len(results) == 0
         assert results == {}
+
+
+class TestRefreshIfChanged:
+    """Test partial refresh functionality."""
+
+    @patch("calends.fetcher.urlopen")
+    def test_refresh_unchanged_url(self, mock_urlopen, tmp_path):
+        """Test that unchanged URLs are detected."""
+        ical_content = "BEGIN:VCALENDAR\nEND:VCALENDAR"
+        
+        # First fetch
+        mock_response = Mock()
+        mock_response.status = 200
+        mock_response.read.return_value = ical_content.encode()
+        mock_response.headers = {"ETag": '"abc123"'}
+        mock_response.__enter__ = Mock(return_value=mock_response)
+        mock_response.__exit__ = Mock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        fetcher = ICalFetcher(show_progress=False)
+        url = "https://example.com/unchanged-refresh.ics"
+        
+        # Initial fetch
+        fetcher.fetch_from_url(url)
+        
+        # Second fetch - simulate 304 Not Modified
+        mock_response.status = 304
+        
+        results, changed = fetcher.refresh_if_changed([url])
+        
+        assert url in results
+        assert url not in changed  # URL not in changed list
+        assert results[url] is not None
+
+    @patch("calends.fetcher.urlopen")
+    def test_refresh_changed_url(self, mock_urlopen):
+        """Test that changed URLs are detected."""
+        original_content = "BEGIN:VCALENDAR\nORIGINAL\nEND:VCALENDAR"
+        modified_content = "BEGIN:VCALENDAR\nMODIFIED\nEND:VCALENDAR"
+
+        call_count = [0]
+
+        def mock_response_factory(*args, **kwargs):
+            call_count[0] += 1
+            mock_response = Mock()
+            mock_response.status = 200
+            # Return different content on second call
+            if call_count[0] == 1:
+                mock_response.read.return_value = original_content.encode()
+            else:
+                mock_response.read.return_value = modified_content.encode()
+            mock_response.headers = {}
+            mock_response.__enter__ = Mock(return_value=mock_response)
+            mock_response.__exit__ = Mock(return_value=False)
+            return mock_response
+
+        mock_urlopen.side_effect = mock_response_factory
+
+        fetcher = ICalFetcher(show_progress=False)
+        url = "https://example.com/changed-refresh.ics"
+
+        # Initial fetch
+        fetcher.fetch_from_url(url)
+
+        # Clear cache expiration to force refetch
+        fetcher.cache._data[url]["timestamp"] = 0
+
+        results, changed = fetcher.refresh_if_changed([url])
+
+        assert url in results
+        assert url in changed  # URL should be in changed list
+        assert "MODIFIED" in results[url]
+
+    def test_refresh_changed_file(self, tmp_path):
+        """Test that changed files are detected."""
+        test_file = tmp_path / "test.ics"
+        test_file.write_text("BEGIN:VCALENDAR\nORIGINAL\nEND:VCALENDAR")
+
+        fetcher = ICalFetcher(show_progress=False)
+        
+        # Initial fetch
+        fetcher.fetch(str(test_file))
+        
+        # Modify file
+        test_file.write_text("BEGIN:VCALENDAR\nMODIFIED\nEND:VCALENDAR")
+        
+        results, changed = fetcher.refresh_if_changed([str(test_file)])
+        
+        assert str(test_file) in results
+        assert str(test_file) in changed
+        assert "MODIFIED" in results[str(test_file)]
+
+    def test_refresh_unchanged_file(self, tmp_path):
+        """Test that unchanged files are detected."""
+        test_file = tmp_path / "test.ics"
+        test_file.write_text("BEGIN:VCALENDAR\nUNCHANGED\nEND:VCALENDAR")
+
+        fetcher = ICalFetcher(show_progress=False)
+
+        # Initial refresh to cache the file
+        results1, changed1 = fetcher.refresh_if_changed([str(test_file)])
+        assert str(test_file) in changed1  # First time is always "changed"
+
+        # Fetch again without modifying
+        results, changed = fetcher.refresh_if_changed([str(test_file)])
+
+        assert str(test_file) in results
+        assert str(test_file) not in changed  # Should not be in changed list now
+        assert results[str(test_file)] is not None
+
+    @patch("calends.fetcher.urlopen")
+    def test_refresh_mixed_sources(self, mock_urlopen, tmp_path):
+        """Test refresh with mix of changed and unchanged sources."""
+        # Create file
+        test_file = tmp_path / "test.ics"
+        test_file.write_text("BEGIN:VCALENDAR\nFILE\nEND:VCALENDAR")
+        
+        # Mock URL
+        mock_response = Mock()
+        mock_response.status = 200
+        mock_response.read.return_value = b"BEGIN:VCALENDAR\nURL\nEND:VCALENDAR"
+        mock_response.headers = {}
+        mock_response.__enter__ = Mock(return_value=mock_response)
+        mock_response.__exit__ = Mock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        fetcher = ICalFetcher(show_progress=False)
+        url = "https://example.com/mixed-refresh.ics"
+        
+        # Initial fetches
+        fetcher.fetch(str(test_file))
+        fetcher.fetch_from_url(url)
+        
+        # Modify only the file
+        test_file.write_text("BEGIN:VCALENDAR\nFILE_MODIFIED\nEND:VCALENDAR")
+        
+        results, changed = fetcher.refresh_if_changed([str(test_file), url])
+        
+        assert len(results) == 2
+        assert len(changed) == 1  # Only file changed
+        assert str(test_file) in changed
+        assert url not in changed

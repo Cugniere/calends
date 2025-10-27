@@ -3,6 +3,7 @@
 import os
 import pickle
 import time
+import hashlib
 from typing import Any, Optional
 from .constants import DEFAULT_CACHE_PATH, DEFAULT_CACHE_EXPIRATION
 
@@ -80,15 +81,29 @@ class Cache:
             return None
         return entry.get("content")
 
-    def set(self, key: str, content: Any) -> None:
+    def set(self, key: str, content: Any, metadata: Optional[dict] = None) -> None:
         """
-        Cache new content with current timestamp.
+        Cache new content with current timestamp and optional metadata.
 
         Args:
             key: Cache key to store under
             content: Content to cache (must be picklable)
+            metadata: Optional metadata (e.g., ETag, Last-Modified, content hash)
         """
-        self._data[key] = {"timestamp": time.time(), "content": content}
+        entry = {
+            "timestamp": time.time(),
+            "content": content,
+        }
+
+        # Store content hash for change detection
+        if isinstance(content, str):
+            entry["content_hash"] = hashlib.sha256(content.encode()).hexdigest()
+
+        # Store HTTP metadata if provided
+        if metadata:
+            entry["metadata"] = metadata
+
+        self._data[key] = entry
         self._save()
 
     def clear(self) -> None:
@@ -160,3 +175,51 @@ class Cache:
             self._save()
 
         return len(expired_keys)
+
+    def get_metadata(self, key: str) -> Optional[dict]:
+        """
+        Get metadata for a cached item without checking expiration.
+
+        Args:
+            key: Cache key to retrieve metadata for
+
+        Returns:
+            Metadata dictionary or None if not found
+        """
+        entry = self._data.get(key)
+        if not entry:
+            return None
+        return entry.get("metadata")
+
+    def get_content_hash(self, key: str) -> Optional[str]:
+        """
+        Get content hash for a cached item.
+
+        Args:
+            key: Cache key to retrieve hash for
+
+        Returns:
+            Content hash (SHA256) or None if not found
+        """
+        entry = self._data.get(key)
+        if not entry:
+            return None
+        return entry.get("content_hash")
+
+    def has_changed(self, key: str, new_content: str) -> bool:
+        """
+        Check if content has changed compared to cached version.
+
+        Args:
+            key: Cache key to check
+            new_content: New content to compare
+
+        Returns:
+            True if content has changed or not in cache, False otherwise
+        """
+        old_hash = self.get_content_hash(key)
+        if not old_hash:
+            return True
+
+        new_hash = hashlib.sha256(new_content.encode()).hexdigest()
+        return old_hash != new_hash

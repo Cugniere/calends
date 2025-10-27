@@ -34,12 +34,13 @@ class ICalFetcher:
         self.cache: Cache = Cache(expiration_seconds=cache_expiration)
         self.show_progress: bool = show_progress
 
-    def fetch_from_url(self, url: str) -> str:
+    def fetch_from_url(self, url: str, force: bool = False) -> str:
         """
         Fetch iCal content from a URL with caching.
 
         Args:
             url: URL to fetch from
+            force: If True, bypass cache and force fresh fetch
 
         Returns:
             The iCal content as a string
@@ -53,7 +54,7 @@ class ICalFetcher:
         if not url or not (url.startswith("http://") or url.startswith("https://")):
             raise ValueError(f"Invalid URL: {url}")
 
-        cached = self.cache.get(url)
+        cached = self.cache.get(url) if not force else None
         if cached:
             if self.show_progress:
                 print(f"{Colors.DIM}  (cached){Colors.RESET}", file=sys.stderr)
@@ -68,8 +69,30 @@ class ICalFetcher:
             )
 
         try:
-            req = Request(url, headers={"User-Agent": "calends/1.0"})
+            headers = {"User-Agent": "calends/1.0"}
+
+            # Add conditional request headers if we have cached metadata
+            metadata = self.cache.get_metadata(url)
+            if metadata and not force:
+                if "etag" in metadata:
+                    headers["If-None-Match"] = metadata["etag"]
+                if "last-modified" in metadata:
+                    headers["If-Modified-Since"] = metadata["last-modified"]
+
+            req = Request(url, headers=headers)
             with urlopen(req, timeout=URL_FETCH_TIMEOUT) as response:
+                # Handle 304 Not Modified - content hasn't changed
+                if response.status == 304:
+                    cached = self.cache.get(url)
+                    if cached:
+                        if self.show_progress:
+                            print(
+                                f" {Colors.DIM}(unchanged){Colors.RESET}",
+                                file=sys.stderr,
+                            )
+                        return cached
+                    # Fallthrough to refetch if no cache
+
                 if response.status != 200:
                     raise Exception(f"HTTP {response.status}: Unexpected response")
 
@@ -83,7 +106,17 @@ class ICalFetcher:
                         f"Response does not appear to be valid iCal format"
                     )
 
-                self.cache.set(url, content)
+                # Extract and store HTTP metadata for conditional requests
+                metadata = {}
+                if hasattr(response, "headers"):
+                    etag = response.headers.get("ETag")
+                    last_modified = response.headers.get("Last-Modified")
+                    if etag:
+                        metadata["etag"] = etag
+                    if last_modified:
+                        metadata["last_modified"] = last_modified
+
+                self.cache.set(url, content, metadata if metadata else None)
 
                 return content
         except HTTPError as e:
@@ -276,3 +309,67 @@ class ICalFetcher:
                     results[url] = self.fetch(url)
 
         return results
+
+    def refresh_if_changed(
+        self, sources: list[str]
+    ) -> tuple[dict[str, Optional[str]], list[str]]:
+        """
+        Fetch sources only if they have changed since last fetch.
+
+        Uses HTTP conditional requests (ETag/Last-Modified) for URLs.
+        For files, compares modification time or content hash.
+
+        Args:
+            sources: List of URLs or file paths
+
+        Returns:
+            Tuple of (results dict, list of changed sources)
+        """
+        results = {}
+        changed = []
+
+        for source in sources:
+            if source.startswith("http://") or source.startswith("https://"):
+                try:
+                    # Get old hash before fetching
+                    old_hash = self.cache.get_content_hash(source)
+
+                    # Try conditional fetch (may return cached if not modified)
+                    content = self.fetch_from_url(source, force=False)
+
+                    # Check if content actually changed by comparing with old hash
+                    import hashlib
+
+                    new_hash = hashlib.sha256(content.encode()).hexdigest()
+                    if old_hash is None or old_hash != new_hash:
+                        # Content changed or first fetch
+                        results[source] = content
+                        if old_hash is not None:  # Not first fetch
+                            changed.append(source)
+                    else:
+                        # Content unchanged
+                        results[source] = content
+                except Exception:
+                    # On error, try to use cache
+                    results[source] = self.cache.get(source)
+            else:
+                # For files, check modification time or content
+                try:
+                    content = self.fetch(source)
+                    if content:
+                        # Check if file content changed
+                        if self.cache.has_changed(source, content):
+                            results[source] = content
+                            changed.append(source)
+                            # Update cache for files too
+                            self.cache.set(source, content)
+                        else:
+                            # Use cached content
+                            cached = self.cache.get(source)
+                            results[source] = cached if cached else content
+                    else:
+                        results[source] = None
+                except Exception:
+                    results[source] = None
+
+        return results, changed

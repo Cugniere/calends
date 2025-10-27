@@ -140,22 +140,64 @@ class CalendarManager:
                 file=sys.stderr,
             )
 
-    def reload_sources(self) -> list[dict]:
+    def reload_sources(self, force: bool = False) -> list[dict]:
         """
-        Reload all calendar sources, clearing cache first.
+        Reload calendar sources, optionally checking for changes first.
+
+        Args:
+            force: If True, clear cache and force full reload.
+                   If False, only reload sources that have changed.
 
         Returns:
             List of all loaded events after refresh
         """
-        # Clear cache to force fresh fetch
-        self.fetcher.cache.clear()
+        if force:
+            # Clear cache to force fresh fetch
+            self.fetcher.cache.clear()
 
-        # Clear events
-        self.events = EventCollection()
+            # Clear events
+            self.events = EventCollection()
 
-        # Reload all sources
-        if self.sources:
-            self.load_sources(self.sources)
+            # Reload all sources
+            if self.sources:
+                self.load_sources(self.sources)
+        else:
+            # Partial refresh - only reload changed sources
+            if self.sources:
+                all_contents, changed_sources = self.fetcher.refresh_if_changed(
+                    self.sources
+                )
+
+                if changed_sources:
+                    if self.show_progress:
+                        print(
+                            f"{Colors.CYAN}{len(changed_sources)} source(s) changed, reloading...{Colors.RESET}",
+                            file=sys.stderr,
+                        )
+
+                    # Clear events and reload everything
+                    # (easier than tracking which events came from which source)
+                    self.events = EventCollection()
+
+                    for source in self.sources:
+                        content = all_contents.get(source)
+                        if content:
+                            parsed_events = self.parser.parse_ical_content(content)
+                            self.events.add_events(parsed_events)
+
+                    self.events.expand_multiday_events()
+
+                    if self.show_progress:
+                        print(
+                            f"{Colors.GREEN}✓{Colors.RESET} Reloaded {self.count_events()} events",
+                            file=sys.stderr,
+                        )
+                else:
+                    if self.show_progress:
+                        print(
+                            f"{Colors.DIM}No changes detected{Colors.RESET}",
+                            file=sys.stderr,
+                        )
 
         return self.get_all_events()
 
