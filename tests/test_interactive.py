@@ -520,3 +520,40 @@ class TestBackgroundRefresh:
         # Test non-silent refresh (would print, but we can't easily capture in test)
         result = view.refresh_events(silent=False)
         assert result is True
+
+    def test_silent_refresh_disables_manager_progress(self):
+        """Test that silent refresh temporarily disables manager progress output."""
+        events = []
+
+        # Create a mock calendar manager
+        class MockManager:
+            def __init__(self):
+                self.show_progress = True
+                self.fetcher = type('obj', (object,), {'show_progress': True})()
+
+        manager = MockManager()
+
+        def mock_callback():
+            # During callback, show_progress should be False
+            assert manager.show_progress is False
+            assert manager.fetcher.show_progress is False
+            return []
+
+        view = WeeklyView(
+            events,
+            target_timezone=timezone.utc,
+            refresh_callback=mock_callback,
+            calendar_manager=manager
+        )
+
+        # Initially, show_progress should be True
+        assert manager.show_progress is True
+        assert manager.fetcher.show_progress is True
+
+        # Silent refresh should temporarily disable it
+        result = view.refresh_events(silent=True)
+        assert result is True
+
+        # After refresh, should be restored
+        assert manager.show_progress is True
+        assert manager.fetcher.show_progress is True

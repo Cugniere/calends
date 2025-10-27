@@ -21,6 +21,7 @@ class WeeklyView:
         target_timezone: Optional[timezone] = None,
         refresh_callback: Optional[Callable[[], list[EventDict]]] = None,
         auto_refresh_interval: int = DEFAULT_AUTO_REFRESH_INTERVAL,
+        calendar_manager: Optional[Any] = None,
     ) -> None:
         self.events: list[EventDict] = events
         self.target_timezone: timezone = target_timezone or timezone.utc
@@ -32,6 +33,7 @@ class WeeklyView:
             refresh_callback
         )
         self.auto_refresh_interval: int = auto_refresh_interval
+        self.calendar_manager: Optional[Any] = calendar_manager
         self._refresh_thread: Optional[threading.Thread] = None
         self._stop_refresh: threading.Event = threading.Event()
         self._needs_redraw: threading.Event = threading.Event()
@@ -204,6 +206,14 @@ class WeeklyView:
             return False
 
         try:
+            # Temporarily disable progress output for silent refresh
+            original_show_progress = None
+            if silent and self.calendar_manager:
+                original_show_progress = self.calendar_manager.show_progress
+                self.calendar_manager.show_progress = False
+                # Also disable fetcher progress
+                self.calendar_manager.fetcher.show_progress = False
+
             if not silent:
                 print(
                     f"\n{Colors.CYAN}Refreshing calendar data...{Colors.RESET}",
@@ -223,6 +233,11 @@ class WeeklyView:
                 print(f"{Colors.RED}✗{Colors.RESET} Failed to refresh: {e}", flush=True)
                 time.sleep(1.5)
             return False
+        finally:
+            # Restore original progress setting
+            if silent and self.calendar_manager and original_show_progress is not None:
+                self.calendar_manager.show_progress = original_show_progress
+                self.calendar_manager.fetcher.show_progress = original_show_progress
 
     def _background_refresh(self) -> None:
         """Background thread that periodically refreshes events."""

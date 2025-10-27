@@ -237,6 +237,7 @@ For more information, visit: https://github.com/anthropics/claude-code
             tz,
             refresh_callback=refresh_callback,
             auto_refresh_interval=auto_refresh_interval,
+            calendar_manager=manager if args.interactive else None,
         )
 
         if args.interactive:
