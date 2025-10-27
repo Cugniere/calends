@@ -54,11 +54,23 @@ def parse_timezone(tz_string: Optional[str]) -> Optional[timezone]:
     return None
 
 
-def load_config(path: str) -> tuple[list[str], Optional[str], int]:
+def load_config(
+    path: str,
+) -> tuple[list[str], Optional[str], int, Optional[dict[str, str]]]:
     """
     Load calendar configuration from a JSON file.
 
-    Expected JSON structure:
+    Expected JSON structure (new format with aliases):
+    {
+        "calendars": {
+            "Work": "https://work.example.com/calendar.ics",
+            "Personal": "/path/to/personal.ics"
+        },
+        "timezone": "UTC" or "+05:30",
+        "cache_expiration": 3600
+    }
+
+    Or old format (backward compatible):
     {
         "calendars": ["url1", "url2", ...],
         "timezone": "UTC" or "+05:30",
@@ -69,7 +81,8 @@ def load_config(path: str) -> tuple[list[str], Optional[str], int]:
         path: Path to the JSON configuration file
 
     Returns:
-        Tuple of (calendar_sources, timezone_string, cache_expiration)
+        Tuple of (calendar_sources, timezone_string, cache_expiration, aliases_dict)
+        aliases_dict maps source URL/path to friendly name, or None if old format
 
     Raises:
         FileNotFoundError: If config file doesn't exist
@@ -94,13 +107,29 @@ def load_config(path: str) -> tuple[list[str], Optional[str], int]:
     if "calendars" not in cfg:
         raise ValueError("Config file must contain 'calendars' field")
 
-    if not isinstance(cfg.get("calendars"), list):
-        raise ValueError("'calendars' must be a list")
+    calendars_field = cfg.get("calendars")
+    calendars: list[str] = []
+    aliases: Optional[dict[str, str]] = None
 
-    calendars: list[str] = cfg["calendars"]
-
-    if not calendars:
-        raise ValueError("'calendars' list cannot be empty")
+    # Support both dict (new format with aliases) and list (old format)
+    if isinstance(calendars_field, dict):
+        # New format: {"alias": "source", ...}
+        if not calendars_field:
+            raise ValueError("'calendars' dict cannot be empty")
+        aliases = {}
+        for alias, source in calendars_field.items():
+            if not isinstance(source, str):
+                raise ValueError(f"Calendar source for '{alias}' must be a string")
+            calendars.append(source)
+            aliases[source] = alias
+    elif isinstance(calendars_field, list):
+        # Old format: ["source1", "source2", ...]
+        calendars = calendars_field
+        if not calendars:
+            raise ValueError("'calendars' list cannot be empty")
+        aliases = None
+    else:
+        raise ValueError("'calendars' must be a list or dict")
 
     timezone_str: Optional[str] = cfg.get("timezone")
 
@@ -113,4 +142,4 @@ def load_config(path: str) -> tuple[list[str], Optional[str], int]:
     except (ValueError, TypeError) as e:
         raise ValueError(f"Invalid 'cache_expiration' value: {e}")
 
-    return calendars, timezone_str, cache_expiration
+    return calendars, timezone_str, cache_expiration, aliases

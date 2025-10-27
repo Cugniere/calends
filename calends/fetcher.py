@@ -34,13 +34,16 @@ class ICalFetcher:
         self.cache: Cache = Cache(expiration_seconds=cache_expiration)
         self.show_progress: bool = show_progress
 
-    def fetch_from_url(self, url: str, force: bool = False) -> str:
+    def fetch_from_url(
+        self, url: str, force: bool = False, display_name: str = None
+    ) -> str:
         """
         Fetch iCal content from a URL with caching.
 
         Args:
             url: URL to fetch from
             force: If True, bypass cache and force fresh fetch
+            display_name: Optional friendly name to display instead of URL
 
         Returns:
             The iCal content as a string
@@ -61,8 +64,9 @@ class ICalFetcher:
             return cached
 
         if self.show_progress:
+            url_display = display_name if display_name else url
             print(
-                f"{Colors.BLUE}Fetching {url}...{Colors.RESET}",
+                f"{Colors.BLUE}Fetching {url_display}...{Colors.RESET}",
                 end="",
                 file=sys.stderr,
                 flush=True,
@@ -217,25 +221,30 @@ class ICalFetcher:
             return None
 
     async def fetch_url_async(
-        self, url: str
+        self, url: str, display_name: Optional[str] = None
     ) -> tuple[str, Optional[str], Optional[str]]:
         """
         Async wrapper for fetch_from_url.
 
         Args:
             url: URL to fetch from
+            display_name: Optional friendly name to display
 
         Returns:
             Tuple of (url, content, error_message)
         """
         loop = asyncio.get_event_loop()
         try:
-            content = await loop.run_in_executor(None, self.fetch_from_url, url)
+            content = await loop.run_in_executor(
+                None, lambda: self.fetch_from_url(url, display_name=display_name)
+            )
             return (url, content, None)
         except Exception as e:
             return (url, None, str(e))
 
-    def fetch_multiple(self, sources: list[str]) -> dict[str, Optional[str]]:
+    def fetch_multiple(
+        self, sources: list[str], aliases: Optional[dict[str, str]] = None
+    ) -> dict[str, Optional[str]]:
         """
         Fetch multiple sources in parallel (URLs only).
 
@@ -244,10 +253,12 @@ class ICalFetcher:
 
         Args:
             sources: List of URLs or file paths
+            aliases: Optional dict mapping source to display name
 
         Returns:
             Dictionary mapping source to content (None if fetch failed)
         """
+        aliases = aliases or {}
         url_sources = [
             s for s in sources if s.startswith("http://") or s.startswith("https://")
         ]
@@ -269,8 +280,9 @@ class ICalFetcher:
                     if cached:
                         results[url] = cached
                         if self.show_progress:
+                            display_name = aliases.get(url, url)
                             print(
-                                f"{Colors.BLUE}Loading {url}...{Colors.RESET} {Colors.DIM}(cached){Colors.RESET}",
+                                f"{Colors.BLUE}Loading {display_name}...{Colors.RESET} {Colors.DIM}(cached){Colors.RESET}",
                                 file=sys.stderr,
                             )
                     else:
@@ -288,7 +300,10 @@ class ICalFetcher:
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
                     try:
-                        tasks = [self.fetch_url_async(url) for url in urls_to_fetch]
+                        tasks = [
+                            self.fetch_url_async(url, aliases.get(url))
+                            for url in urls_to_fetch
+                        ]
                         fetch_results = loop.run_until_complete(asyncio.gather(*tasks))
 
                         for url, content, error in fetch_results:

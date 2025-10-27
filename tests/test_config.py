@@ -39,25 +39,90 @@ class TestLoadConfig:
         }
         config_file.write_text(json.dumps(config_data))
 
-        calendars, timezone_str, cache_exp = load_config(str(config_file))
+        calendars, timezone_str, cache_exp, aliases = load_config(str(config_file))
 
         assert calendars == ["https://example.com/cal.ics"]
         assert timezone_str == "UTC"
         assert cache_exp == 7200
+        assert aliases is None
 
     def test_load_config_with_defaults(self, tmp_path):
         config_file = tmp_path / "config.json"
         config_data = {"calendars": ["calendar.ics"]}
         config_file.write_text(json.dumps(config_data))
 
-        calendars, timezone_str, cache_exp = load_config(str(config_file))
+        calendars, timezone_str, cache_exp, aliases = load_config(str(config_file))
 
         assert calendars == ["calendar.ics"]
         assert cache_exp == 60
+        assert aliases is None
 
     def test_load_nonexistent_config(self):
         with pytest.raises(FileNotFoundError):
             load_config("/nonexistent/path/config.json")
+
+    def test_load_config_with_aliases_dict(self, tmp_path):
+        """Test loading config with new dict format (aliases)."""
+        config_file = tmp_path / "config.json"
+        config_data = {
+            "calendars": {
+                "Work": "https://work.example.com/cal.ics",
+                "Personal": "/path/to/personal.ics"
+            },
+            "timezone": "UTC",
+            "cache_expiration": 3600,
+        }
+        config_file.write_text(json.dumps(config_data))
+
+        calendars, timezone_str, cache_exp, aliases = load_config(str(config_file))
+
+        assert len(calendars) == 2
+        assert "https://work.example.com/cal.ics" in calendars
+        assert "/path/to/personal.ics" in calendars
+        assert timezone_str == "UTC"
+        assert cache_exp == 3600
+        assert aliases is not None
+        assert aliases["https://work.example.com/cal.ics"] == "Work"
+        assert aliases["/path/to/personal.ics"] == "Personal"
+
+    def test_load_config_with_aliases_dict_defaults(self, tmp_path):
+        """Test loading config with aliases and default values."""
+        config_file = tmp_path / "config.json"
+        config_data = {
+            "calendars": {
+                "MyCalendar": "calendar.ics"
+            }
+        }
+        config_file.write_text(json.dumps(config_data))
+
+        calendars, timezone_str, cache_exp, aliases = load_config(str(config_file))
+
+        assert calendars == ["calendar.ics"]
+        assert timezone_str is None
+        assert cache_exp == 60
+        assert aliases == {"calendar.ics": "MyCalendar"}
+
+    def test_load_config_empty_dict_fails(self, tmp_path):
+        """Test that empty calendars dict raises error."""
+        config_file = tmp_path / "config.json"
+        config_data = {"calendars": {}}
+        config_file.write_text(json.dumps(config_data))
+
+        with pytest.raises(ValueError, match="cannot be empty"):
+            load_config(str(config_file))
+
+    def test_load_config_invalid_alias_value(self, tmp_path):
+        """Test that non-string calendar source raises error."""
+        config_file = tmp_path / "config.json"
+        config_data = {
+            "calendars": {
+                "BadCalendar": 123
+            }
+        }
+        config_file.write_text(json.dumps(config_data))
+
+        with pytest.raises(ValueError, match="must be a string"):
+            load_config(str(config_file))
 
 
 class TestFindDefaultConfig:

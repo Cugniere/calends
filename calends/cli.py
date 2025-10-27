@@ -147,9 +147,10 @@ For more information, visit: https://github.com/anthropics/claude-code
     sources: list[str] = []
     tz_str: Optional[str] = None
     cache_exp: int = 60
+    aliases: Optional[dict[str, str]] = None
     if args.config:
         try:
-            s, tz_str, cache_exp = load_config(args.config)
+            s, tz_str, cache_exp, aliases = load_config(args.config)
             sources += s
         except FileNotFoundError:
             print(f"Error: Config file not found: {args.config}", file=sys.stderr)
@@ -171,7 +172,7 @@ For more information, visit: https://github.com/anthropics/claude-code
         if default:
             print(f"Using config file: {default}")
             try:
-                s, tz_str, cache_exp = load_config(default)
+                s, tz_str, cache_exp, aliases = load_config(default)
                 sources += s
             except Exception as e:
                 print(
@@ -212,6 +213,7 @@ For more information, visit: https://github.com/anthropics/claude-code
             target_timezone=tz,
             cache_expiration=cache_exp,
             show_progress=show_progress,
+            aliases=aliases,
         )
         manager.load_sources(sources)
     except Exception as e:

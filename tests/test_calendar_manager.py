@@ -280,3 +280,102 @@ END:VCALENDAR"""
         assert isinstance(events, list)
         assert len(events) == 1
         assert isinstance(events[0], dict)
+
+
+class TestCalendarAliases:
+    """Test calendar alias functionality."""
+
+    def test_init_with_aliases(self):
+        """Test that aliases are stored correctly on init."""
+        aliases = {
+            "https://work.example.com/cal.ics": "Work",
+            "/path/to/personal.ics": "Personal"
+        }
+        manager = CalendarManager(aliases=aliases, show_progress=False)
+
+        assert manager.aliases == aliases
+
+    def test_init_without_aliases(self):
+        """Test that manager works without aliases."""
+        manager = CalendarManager(show_progress=False)
+
+        assert manager.aliases == {}
+
+    def test_get_display_name_with_alias(self):
+        """Test that _get_display_name returns alias when available."""
+        aliases = {
+            "https://work.example.com/cal.ics": "Work Calendar"
+        }
+        manager = CalendarManager(aliases=aliases, show_progress=False)
+
+        display_name = manager._get_display_name("https://work.example.com/cal.ics")
+
+        assert display_name == "Work Calendar"
+
+    def test_get_display_name_without_alias(self):
+        """Test that _get_display_name returns source when no alias."""
+        manager = CalendarManager(show_progress=False)
+
+        display_name = manager._get_display_name("short.ics")
+
+        assert display_name == "short.ics"
+
+    def test_get_display_name_truncates_long_source(self):
+        """Test that _get_display_name truncates long sources without alias."""
+        manager = CalendarManager(show_progress=False)
+        long_url = "https://example.com/" + "a" * 100 + "/calendar.ics"
+
+        display_name = manager._get_display_name(long_url)
+
+        assert len(display_name) <= 60
+        assert display_name.startswith("...")
+
+    def test_load_source_with_alias(self, tmp_path, capsys):
+        """Test that load_source uses alias in output."""
+        ical_content = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:test@example.com
+DTSTART:20250115T140000Z
+DTEND:20250115T150000Z
+SUMMARY:Test Event
+END:VEVENT
+END:VCALENDAR"""
+
+        test_file = tmp_path / "calendar.ics"
+        test_file.write_text(ical_content)
+
+        aliases = {str(test_file): "My Work Calendar"}
+        manager = CalendarManager(aliases=aliases, show_progress=True)
+        manager.load_source(str(test_file))
+
+        captured = capsys.readouterr()
+        assert "My Work Calendar" in captured.err
+
+    def test_load_sources_with_aliases(self, tmp_path, capsys):
+        """Test that load_sources uses aliases for multiple sources."""
+        ical_content = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:test@example.com
+DTSTART:20250115T140000Z
+DTEND:20250115T150000Z
+SUMMARY:Test Event
+END:VEVENT
+END:VCALENDAR"""
+
+        file1 = tmp_path / "cal1.ics"
+        file2 = tmp_path / "cal2.ics"
+        file1.write_text(ical_content)
+        file2.write_text(ical_content)
+
+        aliases = {
+            str(file1): "Work",
+            str(file2): "Personal"
+        }
+        manager = CalendarManager(aliases=aliases, show_progress=True)
+        manager.load_sources([str(file1), str(file2)])
+
+        captured = capsys.readouterr()
+        assert "Work" in captured.err
+        assert "Personal" in captured.err

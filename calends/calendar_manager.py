@@ -28,6 +28,7 @@ class CalendarManager:
         target_timezone: Optional[timezone] = None,
         cache_expiration: int = DEFAULT_CACHE_EXPIRATION,
         show_progress: bool = True,
+        aliases: Optional[dict[str, str]] = None,
     ) -> None:
         """
         Initialize the calendar manager.
@@ -36,12 +37,29 @@ class CalendarManager:
             target_timezone: Optional timezone to convert event times to
             cache_expiration: Cache expiration time in seconds
             show_progress: Whether to show progress indicators
+            aliases: Optional dict mapping source URL/path to friendly name
         """
         self.parser: ICalParser = ICalParser(target_timezone)
         self.fetcher: ICalFetcher = ICalFetcher(cache_expiration, show_progress)
         self.events: EventCollection = EventCollection()
         self.show_progress: bool = show_progress
         self.sources: list[str] = []
+        self.aliases: dict[str, str] = aliases or {}
+
+    def _get_display_name(self, source: str) -> str:
+        """
+        Get display name for a source (alias if available, otherwise truncated source).
+
+        Args:
+            source: Source URL or path
+
+        Returns:
+            Display name for the source
+        """
+        if source in self.aliases:
+            return self.aliases[source]
+        # Truncate long sources
+        return source if len(source) <= 60 else "..." + source[-57:]
 
     def load_source(self, source: str) -> None:
         """
@@ -51,9 +69,9 @@ class CalendarManager:
             source: URL or file path to calendar source
         """
         is_url = source.startswith("http://") or source.startswith("https://")
+        source_display = self._get_display_name(source)
 
         if self.show_progress and not is_url:
-            source_display = source if len(source) <= 60 else "..." + source[-57:]
             print(
                 f"{Colors.BLUE}Loading {source_display}...{Colors.RESET}",
                 end="",
@@ -106,7 +124,7 @@ class CalendarManager:
 
         if len(url_sources) > 1:
             # Use parallel fetching for multiple URLs
-            all_contents = self.fetcher.fetch_multiple(sources)
+            all_contents = self.fetcher.fetch_multiple(sources, self.aliases)
 
             for source in sources:
                 content = all_contents.get(source)
@@ -122,9 +140,7 @@ class CalendarManager:
                     added_count = self.events.count() - initial_count
 
                     if self.show_progress:
-                        source_display = (
-                            source if len(source) <= 60 else "..." + source[-57:]
-                        )
+                        source_display = self._get_display_name(source)
                         print(
                             f"{Colors.BLUE}{source_display}{Colors.RESET} {Colors.GREEN}✓{Colors.RESET} ({added_count} events)",
                             file=sys.stderr,
