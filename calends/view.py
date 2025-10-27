@@ -1,7 +1,7 @@
 import sys
 from datetime import datetime, timedelta, timezone, date
 from collections import defaultdict
-from typing import Optional, Any
+from typing import Optional, Any, Callable
 from .colors import Colors
 from .interactive import KeyboardInput
 
@@ -16,6 +16,7 @@ class WeeklyView:
         events: list[EventDict],
         start_date: Optional[datetime] = None,
         target_timezone: Optional[timezone] = None,
+        refresh_callback: Optional[Callable[[], list[EventDict]]] = None,
     ) -> None:
         self.events: list[EventDict] = events
         self.target_timezone: timezone = target_timezone or timezone.utc
@@ -23,6 +24,7 @@ class WeeklyView:
         if self.start_date.tzinfo is None:
             self.start_date = self.start_date.replace(tzinfo=self.target_timezone)
         self.end_date: datetime = self.start_date + timedelta(days=7)
+        self.refresh_callback: Optional[Callable[[], list[EventDict]]] = refresh_callback
 
     def get_monday(self) -> datetime:
         """
@@ -178,6 +180,30 @@ class WeeklyView:
         """Go to the current week."""
         self.set_week(datetime.now(self.target_timezone))
 
+    def refresh_events(self) -> bool:
+        """
+        Refresh calendar events by calling the refresh callback.
+
+        Returns:
+            True if refresh was successful, False otherwise
+        """
+        if not self.refresh_callback:
+            return False
+
+        try:
+            print(f"\n{Colors.CYAN}Refreshing calendar data...{Colors.RESET}", flush=True)
+            new_events = self.refresh_callback()
+            self.events = new_events
+            print(f"{Colors.GREEN}✓{Colors.RESET} Loaded {len(new_events)} events", flush=True)
+            import time
+            time.sleep(0.5)
+            return True
+        except Exception as e:
+            print(f"{Colors.RED}✗{Colors.RESET} Failed to refresh: {e}", flush=True)
+            import time
+            time.sleep(1.5)
+            return False
+
     def display_interactive(self) -> None:
         """
         Display the calendar in interactive mode with navigation.
@@ -195,7 +221,14 @@ class WeeklyView:
         while running:
             kb.clear_screen()
             self.display()
-            print(f"\n{Colors.DIM}[n]ext  [p]revious  [t]oday  [j]ump  [h]elp  [q]uit{Colors.RESET}", flush=True)
+
+            # Build status bar based on available features
+            status_items = ["[n]ext", "[p]revious", "[t]oday", "[j]ump"]
+            if self.refresh_callback:
+                status_items.append("[r]efresh")
+            status_items.extend(["[h]elp", "[q]uit"])
+            status_bar = "  ".join(status_items)
+            print(f"\n{Colors.DIM}{status_bar}{Colors.RESET}", flush=True)
 
             key = kb.get_key()
 
@@ -209,6 +242,8 @@ class WeeklyView:
                 self.go_to_today()
             elif key in ['j', 'J']:
                 self._jump_to_date(kb)
+            elif key in ['r', 'R']:
+                self.refresh_events()
             elif key in ['h', 'H', '?']:
                 kb.show_help()
                 kb.get_key()

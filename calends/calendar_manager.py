@@ -41,6 +41,7 @@ class CalendarManager:
         self.fetcher: ICalFetcher = ICalFetcher(cache_expiration, show_progress)
         self.events: EventCollection = EventCollection()
         self.show_progress: bool = show_progress
+        self.sources: list[str] = []
 
     def load_source(self, source: str) -> None:
         """
@@ -77,6 +78,8 @@ class CalendarManager:
         Args:
             sources: List of URLs or file paths to calendar sources
         """
+        self.sources = sources
+
         if self.show_progress and len(sources) > 1:
             print(f"{Colors.BOLD}Loading {len(sources)} calendar sources...{Colors.RESET}", file=sys.stderr)
 
@@ -85,6 +88,25 @@ class CalendarManager:
 
         if self.show_progress and len(sources) > 1:
             print(f"{Colors.BOLD}Loaded {self.count_events()} total events{Colors.RESET}\n", file=sys.stderr)
+
+    def reload_sources(self) -> list[dict]:
+        """
+        Reload all calendar sources, clearing cache first.
+
+        Returns:
+            List of all loaded events after refresh
+        """
+        # Clear cache to force fresh fetch
+        self.fetcher.cache.clear()
+
+        # Clear events
+        self.events = EventCollection()
+
+        # Reload all sources
+        if self.sources:
+            self.load_sources(self.sources)
+
+        return self.get_all_events()
 
     def get_all_events(self) -> list[dict]:
         """

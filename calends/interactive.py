@@ -64,6 +64,7 @@ class KeyboardInput:
         print(f"{Colors.CYAN}  p, ←{Colors.RESET}         Previous week")
         print(f"{Colors.CYAN}  t{Colors.RESET}            Today (current week)")
         print(f"{Colors.CYAN}  j{Colors.RESET}            Jump to specific date")
+        print(f"{Colors.CYAN}  r{Colors.RESET}            Refresh calendar data")
         print(f"{Colors.CYAN}  h, ?{Colors.RESET}         Show this help")
         print(f"{Colors.CYAN}  q, ESC{Colors.RESET}       Quit")
         print(f"\n{Colors.DIM}Press any key to continue...{Colors.RESET}", flush=True)

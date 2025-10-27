@@ -197,7 +197,16 @@ For more information, visit: https://github.com/anthropics/claude-code
         sys.exit(1)
 
     try:
-        view: WeeklyView = WeeklyView(manager.get_all_events(), start, tz)
+        # Create refresh callback for interactive mode
+        refresh_callback = manager.reload_sources if args.interactive else None
+
+        view: WeeklyView = WeeklyView(
+            manager.get_all_events(),
+            start,
+            tz,
+            refresh_callback=refresh_callback
+        )
+
         if args.interactive:
             view.display_interactive()
         else:
