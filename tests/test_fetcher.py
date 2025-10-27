@@ -260,3 +260,157 @@ END:VCALENDAR"""
         result = fetcher.fetch("http://example.com/calendar.ics")
 
         assert result == ical_content
+
+
+class TestFetchMultiple:
+    """Test parallel fetching of multiple sources."""
+
+    @patch("calends.fetcher.urlopen")
+    def test_fetch_multiple_urls(self, mock_urlopen):
+        """Test fetching multiple URLs in parallel."""
+        mock_response = Mock()
+        mock_response.status = 200
+        mock_response.read.return_value = b"BEGIN:VCALENDAR\nEND:VCALENDAR"
+        mock_response.__enter__ = Mock(return_value=mock_response)
+        mock_response.__exit__ = Mock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        fetcher = ICalFetcher(show_progress=False)
+        sources = [
+            "https://example.com/cal1-parallel.ics",
+            "https://example.com/cal2-parallel.ics",
+            "https://example.com/cal3-parallel.ics",
+        ]
+
+        results = fetcher.fetch_multiple(sources)
+
+        assert len(results) == 3
+        for source in sources:
+            assert source in results
+            assert results[source] is not None
+            assert "BEGIN:VCALENDAR" in results[source]
+
+    @patch("calends.fetcher.urlopen")
+    def test_fetch_multiple_mixed_sources(self, mock_urlopen, tmp_path):
+        """Test fetching mix of URLs and files."""
+        # Create test file
+        test_file = tmp_path / "test.ics"
+        test_file.write_text("BEGIN:VCALENDAR\nEND:VCALENDAR")
+
+        # Mock URL
+        mock_response = Mock()
+        mock_response.status = 200
+        mock_response.read.return_value = b"BEGIN:VCALENDAR\nURL_CONTENT\nEND:VCALENDAR"
+        mock_response.__enter__ = Mock(return_value=mock_response)
+        mock_response.__exit__ = Mock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        fetcher = ICalFetcher(show_progress=False)
+        sources = [
+            str(test_file),
+            "https://example.com/cal-mixed.ics",
+        ]
+
+        results = fetcher.fetch_multiple(sources)
+
+        assert len(results) == 2
+        assert results[str(test_file)] is not None
+        assert "BEGIN:VCALENDAR" in results[str(test_file)]
+        assert results["https://example.com/cal-mixed.ics"] is not None
+        assert "URL_CONTENT" in results["https://example.com/cal-mixed.ics"]
+
+    @patch("calends.fetcher.urlopen")
+    def test_fetch_multiple_with_cache(self, mock_urlopen):
+        """Test that fetch_multiple uses cache."""
+        mock_response = Mock()
+        mock_response.status = 200
+        mock_response.read.return_value = b"BEGIN:VCALENDAR\nEND:VCALENDAR"
+        mock_response.__enter__ = Mock(return_value=mock_response)
+        mock_response.__exit__ = Mock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        fetcher = ICalFetcher(show_progress=False)
+        url = "https://example.com/cached-parallel-test.ics"
+
+        # First fetch - should call urlopen
+        fetcher.fetch_from_url(url)
+        call_count_1 = mock_urlopen.call_count
+
+        # Second fetch via fetch_multiple - should use cache
+        results = fetcher.fetch_multiple([url])
+
+        assert results[url] is not None
+        assert mock_urlopen.call_count == call_count_1  # No new call
+
+    @patch("calends.fetcher.urlopen")
+    def test_fetch_multiple_single_url(self, mock_urlopen):
+        """Test fetch_multiple with single URL falls back to sequential."""
+        mock_response = Mock()
+        mock_response.status = 200
+        mock_response.read.return_value = b"BEGIN:VCALENDAR\nEND:VCALENDAR"
+        mock_response.__enter__ = Mock(return_value=mock_response)
+        mock_response.__exit__ = Mock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        fetcher = ICalFetcher(show_progress=False)
+        sources = ["https://example.com/single-parallel.ics"]
+
+        results = fetcher.fetch_multiple(sources)
+
+        assert len(results) == 1
+        assert results[sources[0]] is not None
+
+    def test_fetch_multiple_files_only(self, tmp_path):
+        """Test fetch_multiple with only files (no parallel needed)."""
+        file1 = tmp_path / "test1.ics"
+        file2 = tmp_path / "test2.ics"
+        file1.write_text("BEGIN:VCALENDAR\nFILE1\nEND:VCALENDAR")
+        file2.write_text("BEGIN:VCALENDAR\nFILE2\nEND:VCALENDAR")
+
+        fetcher = ICalFetcher(show_progress=False)
+        sources = [str(file1), str(file2)]
+
+        results = fetcher.fetch_multiple(sources)
+
+        assert len(results) == 2
+        assert "FILE1" in results[str(file1)]
+        assert "FILE2" in results[str(file2)]
+
+    @patch("calends.fetcher.urlopen")
+    def test_fetch_multiple_with_failures(self, mock_urlopen):
+        """Test fetch_multiple handles partial failures."""
+
+        def side_effect(*args, **kwargs):
+            url = args[0].full_url if hasattr(args[0], "full_url") else str(args[0])
+            if "fail" in url:
+                from urllib.error import HTTPError
+
+                raise HTTPError(url, 404, "Not Found", {}, None)
+            mock_response = Mock()
+            mock_response.status = 200
+            mock_response.read.return_value = b"BEGIN:VCALENDAR\nEND:VCALENDAR"
+            mock_response.__enter__ = Mock(return_value=mock_response)
+            mock_response.__exit__ = Mock(return_value=False)
+            return mock_response
+
+        mock_urlopen.side_effect = side_effect
+
+        fetcher = ICalFetcher(show_progress=False)
+        sources = [
+            "https://example.com/success-parallel.ics",
+            "https://example.com/fail-parallel.ics",
+        ]
+
+        results = fetcher.fetch_multiple(sources)
+
+        assert len(results) == 2
+        assert results["https://example.com/success-parallel.ics"] is not None
+        assert results["https://example.com/fail-parallel.ics"] is None
+
+    def test_fetch_multiple_empty_list(self):
+        """Test fetch_multiple with empty list."""
+        fetcher = ICalFetcher(show_progress=False)
+        results = fetcher.fetch_multiple([])
+
+        assert len(results) == 0
+        assert results == {}

@@ -65,11 +65,12 @@ Create `calendars.json` or `calends.json`:
 ## Features
 
 - Weekly calendar view
-- **Interactive navigation** (arrow keys, n/p for next/previous week, t for today, j to jump to date)
+- **Interactive navigation** (arrow keys, n/p for next/previous week, t for today, j to jump to date, r to refresh)
 - Support for recurring events (RRULE)
 - Multi-day event expansion
 - Timezone conversion
 - **Smart URL caching** with manual cache management (--cache-info, --clear-cache)
+- **Parallel URL fetching** for faster loading when multiple calendar URLs are provided
 - Progress indicators for slow network operations
 - Color-coded display (ongoing/past/future events)
 

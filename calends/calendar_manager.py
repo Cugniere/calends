@@ -86,6 +86,8 @@ class CalendarManager:
         """
         Load events from multiple calendar sources.
 
+        Uses parallel fetching for URLs to improve performance.
+
         Args:
             sources: List of URLs or file paths to calendar sources
         """
@@ -97,8 +99,40 @@ class CalendarManager:
                 file=sys.stderr,
             )
 
-        for source in sources:
-            self.load_source(source)
+        # Check if we have multiple URLs that could benefit from parallel fetching
+        url_sources = [
+            s for s in sources if s.startswith("http://") or s.startswith("https://")
+        ]
+
+        if len(url_sources) > 1:
+            # Use parallel fetching for multiple URLs
+            all_contents = self.fetcher.fetch_multiple(sources)
+
+            for source in sources:
+                content = all_contents.get(source)
+                if content:
+                    is_url = source.startswith("http://") or source.startswith(
+                        "https://"
+                    )
+
+                    initial_count = self.events.count()
+                    parsed_events = self.parser.parse_ical_content(content)
+                    self.events.add_events(parsed_events)
+                    self.events.expand_multiday_events()
+                    added_count = self.events.count() - initial_count
+
+                    if self.show_progress:
+                        source_display = (
+                            source if len(source) <= 60 else "..." + source[-57:]
+                        )
+                        print(
+                            f"{Colors.BLUE}{source_display}{Colors.RESET} {Colors.GREEN}✓{Colors.RESET} ({added_count} events)",
+                            file=sys.stderr,
+                        )
+        else:
+            # Use sequential loading for single URL or file-only sources
+            for source in sources:
+                self.load_source(source)
 
         if self.show_progress and len(sources) > 1:
             print(

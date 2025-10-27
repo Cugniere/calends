@@ -1,6 +1,8 @@
 """Handles fetching iCal content from URLs and files with caching."""
 
 import sys
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 from typing import Optional
@@ -180,3 +182,97 @@ class ICalFetcher:
         except Exception as e:
             print(f"Error reading {source}: {e}", file=sys.stderr)
             return None
+
+    async def fetch_url_async(
+        self, url: str
+    ) -> tuple[str, Optional[str], Optional[str]]:
+        """
+        Async wrapper for fetch_from_url.
+
+        Args:
+            url: URL to fetch from
+
+        Returns:
+            Tuple of (url, content, error_message)
+        """
+        loop = asyncio.get_event_loop()
+        try:
+            content = await loop.run_in_executor(None, self.fetch_from_url, url)
+            return (url, content, None)
+        except Exception as e:
+            return (url, None, str(e))
+
+    def fetch_multiple(self, sources: list[str]) -> dict[str, Optional[str]]:
+        """
+        Fetch multiple sources in parallel (URLs only).
+
+        File sources are fetched synchronously. URL sources are fetched
+        in parallel using async operations for better performance.
+
+        Args:
+            sources: List of URLs or file paths
+
+        Returns:
+            Dictionary mapping source to content (None if fetch failed)
+        """
+        url_sources = [
+            s for s in sources if s.startswith("http://") or s.startswith("https://")
+        ]
+        file_sources = [s for s in sources if s not in url_sources]
+
+        results = {}
+
+        # Fetch files synchronously (they're fast anyway)
+        for source in file_sources:
+            results[source] = self.fetch(source)
+
+        # Fetch URLs in parallel if there are any
+        if url_sources:
+            try:
+                # Check if any URLs are cached
+                urls_to_fetch = []
+                for url in url_sources:
+                    cached = self.cache.get(url)
+                    if cached:
+                        results[url] = cached
+                        if self.show_progress:
+                            print(
+                                f"{Colors.BLUE}Loading {url}...{Colors.RESET} {Colors.DIM}(cached){Colors.RESET}",
+                                file=sys.stderr,
+                            )
+                    else:
+                        urls_to_fetch.append(url)
+
+                # Fetch non-cached URLs in parallel
+                if urls_to_fetch:
+                    if self.show_progress and len(urls_to_fetch) > 1:
+                        print(
+                            f"{Colors.BOLD}Fetching {len(urls_to_fetch)} URLs...{Colors.RESET}",
+                            file=sys.stderr,
+                        )
+
+                    # Run async fetches
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        tasks = [self.fetch_url_async(url) for url in urls_to_fetch]
+                        fetch_results = loop.run_until_complete(asyncio.gather(*tasks))
+
+                        for url, content, error in fetch_results:
+                            if error:
+                                results[url] = None
+                            else:
+                                results[url] = content
+                    finally:
+                        loop.close()
+            except Exception as e:
+                # Fallback to sequential fetching
+                if self.show_progress:
+                    print(
+                        f"{Colors.YELLOW}Warning: Parallel fetching failed, falling back to sequential{Colors.RESET}",
+                        file=sys.stderr,
+                    )
+                for url in urls_to_fetch:
+                    results[url] = self.fetch(url)
+
+        return results
