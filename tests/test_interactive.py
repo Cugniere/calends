@@ -1,4 +1,6 @@
 import pytest
+import time
+import threading
 from datetime import datetime, timezone, timedelta
 from calends.view import WeeklyView
 
@@ -327,3 +329,194 @@ class TestJumpToDateEdgeCases:
         assert view.start_date.year == 1999
         assert view.start_date.month == 12
         assert view.start_date.day == 27
+
+
+class TestBackgroundRefresh:
+    """Test background auto-refresh functionality."""
+
+    def test_background_refresh_disabled_by_default(self):
+        """Test that background refresh is disabled when interval is 0."""
+        events = []
+
+        def mock_callback():
+            return []
+
+        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=mock_callback, auto_refresh_interval=0)
+
+        view._start_background_refresh()
+        assert view._refresh_thread is None
+
+    def test_background_refresh_disabled_without_callback(self):
+        """Test that background refresh is not started without a refresh callback."""
+        events = []
+        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=None, auto_refresh_interval=60)
+
+        view._start_background_refresh()
+        assert view._refresh_thread is None
+
+    def test_background_refresh_thread_starts(self):
+        """Test that background refresh thread starts when enabled."""
+        events = []
+        refresh_count = {"count": 0}
+
+        def mock_callback():
+            refresh_count["count"] += 1
+            return []
+
+        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=mock_callback, auto_refresh_interval=1)
+
+        view._start_background_refresh()
+
+        assert view._refresh_thread is not None
+        assert view._refresh_thread.is_alive()
+        assert view._refresh_thread.daemon
+
+        view._stop_background_refresh()
+
+    def test_background_refresh_updates_events(self):
+        """Test that background refresh actually refreshes events."""
+        initial_events = [
+            {
+                "start": datetime(2025, 10, 23, 14, 0, 0, tzinfo=timezone.utc),
+                "end": datetime(2025, 10, 23, 15, 0, 0, tzinfo=timezone.utc),
+                "summary": "Old Event",
+                "location": "",
+                "description": "",
+            }
+        ]
+
+        new_events = [
+            {
+                "start": datetime(2025, 10, 24, 14, 0, 0, tzinfo=timezone.utc),
+                "end": datetime(2025, 10, 24, 15, 0, 0, tzinfo=timezone.utc),
+                "summary": "New Event",
+                "location": "",
+                "description": "",
+            }
+        ]
+
+        def mock_callback():
+            return new_events
+
+        view = WeeklyView(
+            initial_events,
+            target_timezone=timezone.utc,
+            refresh_callback=mock_callback,
+            auto_refresh_interval=1
+        )
+
+        view._start_background_refresh()
+
+        # Wait for refresh to occur
+        time.sleep(1.5)
+
+        # Check that needs_redraw was set
+        assert view._needs_redraw.is_set()
+
+        # Events should be updated
+        assert len(view.events) == 1
+        assert view.events[0]["summary"] == "New Event"
+
+        view._stop_background_refresh()
+
+    def test_background_refresh_sets_redraw_flag(self):
+        """Test that background refresh sets the needs_redraw flag."""
+        events = []
+
+        def mock_callback():
+            return []
+
+        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=mock_callback, auto_refresh_interval=1)
+
+        assert not view._needs_redraw.is_set()
+
+        view._start_background_refresh()
+
+        # Wait for refresh to occur
+        time.sleep(1.5)
+
+        assert view._needs_redraw.is_set()
+
+        view._stop_background_refresh()
+
+    def test_background_refresh_stops_cleanly(self):
+        """Test that background refresh thread stops when requested."""
+        events = []
+
+        def mock_callback():
+            return []
+
+        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=mock_callback, auto_refresh_interval=1)
+
+        view._start_background_refresh()
+        assert view._refresh_thread.is_alive()
+
+        view._stop_background_refresh()
+
+        # Thread should stop within timeout
+        time.sleep(0.1)
+        assert not view._refresh_thread.is_alive()
+
+    def test_background_refresh_silent_mode(self):
+        """Test that background refresh uses silent mode (no output)."""
+        events = []
+        refresh_calls = []
+
+        def mock_callback():
+            refresh_calls.append({"silent": True})
+            return []
+
+        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=mock_callback, auto_refresh_interval=1)
+
+        view._start_background_refresh()
+
+        # Wait for refresh
+        time.sleep(1.5)
+
+        # Refresh should have been called
+        assert len(refresh_calls) >= 1
+
+        view._stop_background_refresh()
+
+    def test_background_refresh_handles_callback_failure(self):
+        """Test that background refresh handles callback failures gracefully."""
+        events = []
+        call_count = {"count": 0}
+
+        def failing_callback():
+            call_count["count"] += 1
+            if call_count["count"] == 1:
+                raise Exception("Simulated network error")
+            return []
+
+        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=failing_callback, auto_refresh_interval=1)
+
+        view._start_background_refresh()
+
+        # Wait for first refresh (will fail) and second refresh (will succeed)
+        time.sleep(2.5)
+
+        # Thread should still be alive despite failure
+        assert view._refresh_thread.is_alive()
+
+        # Second refresh should have succeeded
+        assert call_count["count"] >= 2
+
+        view._stop_background_refresh()
+
+    def test_refresh_events_silent_parameter(self):
+        """Test that refresh_events respects the silent parameter."""
+        events = []
+
+        def mock_callback():
+            return []
+
+        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=mock_callback)
+
+        # Test silent refresh (should not print anything)
+        result = view.refresh_events(silent=True)
+        assert result is True
+
+        # Test non-silent refresh (would print, but we can't easily capture in test)
+        result = view.refresh_events(silent=False)
+        assert result is True

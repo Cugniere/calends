@@ -12,3 +12,6 @@ URL_FETCH_TIMEOUT = 10
 # Config file settings
 DEFAULT_CONFIG_FILES = ["calendars.json", "calends.json"]
 DEFAULT_CACHE_EXPIRATION_CONFIG = 60
+
+# Interactive mode settings
+DEFAULT_AUTO_REFRESH_INTERVAL = 60  # seconds, 0 to disable

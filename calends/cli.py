@@ -8,6 +8,7 @@ from .colors import Colors
 from .calendar_manager import CalendarManager
 from .view import WeeklyView
 from .config import find_default_config, load_config, parse_timezone
+from .constants import DEFAULT_AUTO_REFRESH_INTERVAL
 
 
 def main() -> None:
@@ -78,6 +79,12 @@ For more information, visit: https://github.com/anthropics/claude-code
         "--interactive",
         action="store_true",
         help="Enable interactive mode for navigating between weeks.",
+    )
+    parser.add_argument(
+        "--auto-refresh",
+        metavar="SECONDS",
+        type=int,
+        help="Auto-refresh interval in seconds for interactive mode (default: 60, 0 to disable).",
     )
     parser.add_argument(
         "--clear-cache",
@@ -219,8 +226,17 @@ For more information, visit: https://github.com/anthropics/claude-code
         # Create refresh callback for interactive mode
         refresh_callback = manager.reload_sources if args.interactive else None
 
+        # Set auto-refresh interval
+        auto_refresh_interval = DEFAULT_AUTO_REFRESH_INTERVAL
+        if args.auto_refresh is not None:
+            auto_refresh_interval = args.auto_refresh
+
         view: WeeklyView = WeeklyView(
-            manager.get_all_events(), start, tz, refresh_callback=refresh_callback
+            manager.get_all_events(),
+            start,
+            tz,
+            refresh_callback=refresh_callback,
+            auto_refresh_interval=auto_refresh_interval,
         )
 
         if args.interactive:

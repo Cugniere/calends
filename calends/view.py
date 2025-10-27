@@ -1,9 +1,12 @@
 import sys
+import threading
+import time
 from datetime import datetime, timedelta, timezone, date
 from collections import defaultdict
 from typing import Optional, Any, Callable
 from .colors import Colors
 from .interactive import KeyboardInput
+from .constants import DEFAULT_AUTO_REFRESH_INTERVAL
 
 EventDict = dict[str, Any]
 
@@ -17,6 +20,7 @@ class WeeklyView:
         start_date: Optional[datetime] = None,
         target_timezone: Optional[timezone] = None,
         refresh_callback: Optional[Callable[[], list[EventDict]]] = None,
+        auto_refresh_interval: int = DEFAULT_AUTO_REFRESH_INTERVAL,
     ) -> None:
         self.events: list[EventDict] = events
         self.target_timezone: timezone = target_timezone or timezone.utc
@@ -27,6 +31,10 @@ class WeeklyView:
         self.refresh_callback: Optional[Callable[[], list[EventDict]]] = (
             refresh_callback
         )
+        self.auto_refresh_interval: int = auto_refresh_interval
+        self._refresh_thread: Optional[threading.Thread] = None
+        self._stop_refresh: threading.Event = threading.Event()
+        self._needs_redraw: threading.Event = threading.Event()
 
     def get_monday(self) -> datetime:
         """
@@ -182,9 +190,12 @@ class WeeklyView:
         """Go to the current week."""
         self.set_week(datetime.now(self.target_timezone))
 
-    def refresh_events(self) -> bool:
+    def refresh_events(self, silent: bool = False) -> bool:
         """
         Refresh calendar events by calling the refresh callback.
+
+        Args:
+            silent: If True, suppress output messages
 
         Returns:
             True if refresh was successful, False otherwise
@@ -193,25 +204,50 @@ class WeeklyView:
             return False
 
         try:
-            print(
-                f"\n{Colors.CYAN}Refreshing calendar data...{Colors.RESET}", flush=True
-            )
+            if not silent:
+                print(
+                    f"\n{Colors.CYAN}Refreshing calendar data...{Colors.RESET}",
+                    flush=True,
+                )
             new_events = self.refresh_callback()
             self.events = new_events
-            print(
-                f"{Colors.GREEN}✓{Colors.RESET} Loaded {len(new_events)} events",
-                flush=True,
-            )
-            import time
-
-            time.sleep(0.5)
+            if not silent:
+                print(
+                    f"{Colors.GREEN}✓{Colors.RESET} Loaded {len(new_events)} events",
+                    flush=True,
+                )
+                time.sleep(0.5)
             return True
         except Exception as e:
-            print(f"{Colors.RED}✗{Colors.RESET} Failed to refresh: {e}", flush=True)
-            import time
-
-            time.sleep(1.5)
+            if not silent:
+                print(f"{Colors.RED}✗{Colors.RESET} Failed to refresh: {e}", flush=True)
+                time.sleep(1.5)
             return False
+
+    def _background_refresh(self) -> None:
+        """Background thread that periodically refreshes events."""
+        while not self._stop_refresh.wait(self.auto_refresh_interval):
+            if self.refresh_callback:
+                # Perform silent refresh
+                success = self.refresh_events(silent=True)
+                if success:
+                    # Signal that display needs redraw
+                    self._needs_redraw.set()
+
+    def _start_background_refresh(self) -> None:
+        """Start the background refresh thread if enabled."""
+        if self.auto_refresh_interval > 0 and self.refresh_callback:
+            self._stop_refresh.clear()
+            self._refresh_thread = threading.Thread(
+                target=self._background_refresh, daemon=True
+            )
+            self._refresh_thread.start()
+
+    def _stop_background_refresh(self) -> None:
+        """Stop the background refresh thread."""
+        if self._refresh_thread and self._refresh_thread.is_alive():
+            self._stop_refresh.set()
+            self._refresh_thread.join(timeout=1.0)
 
     def display_interactive(self) -> None:
         """
@@ -227,35 +263,47 @@ class WeeklyView:
         kb = KeyboardInput()
         running = True
 
-        while running:
-            kb.clear_screen()
-            self.display()
+        # Start background refresh if enabled
+        self._start_background_refresh()
 
-            # Build status bar based on available features
-            status_items = ["[n]ext", "[p]revious", "[t]oday", "[j]ump"]
-            if self.refresh_callback:
-                status_items.append("[r]efresh")
-            status_items.extend(["[h]elp", "[q]uit"])
-            status_bar = "  ".join(status_items)
-            print(f"\n{Colors.DIM}{status_bar}{Colors.RESET}", flush=True)
+        try:
+            while running:
+                # Check if background refresh triggered a redraw
+                if self._needs_redraw.is_set():
+                    self._needs_redraw.clear()
+                    # Continue to redraw
 
-            key = kb.get_key()
+                kb.clear_screen()
+                self.display()
 
-            if key in ["q", "Q", "ESC", "CTRL_C", "CTRL_D"]:
-                running = False
-            elif key in ["n", "N", "RIGHT", " "]:
-                self.next_week()
-            elif key in ["p", "P", "LEFT"]:
-                self.previous_week()
-            elif key in ["t", "T"]:
-                self.go_to_today()
-            elif key in ["j", "J"]:
-                self._jump_to_date(kb)
-            elif key in ["r", "R"]:
-                self.refresh_events()
-            elif key in ["h", "H", "?"]:
-                kb.show_help()
-                kb.get_key()
+                # Build status bar based on available features
+                status_items = ["[n]ext", "[p]revious", "[t]oday", "[j]ump"]
+                if self.refresh_callback:
+                    status_items.append("[r]efresh")
+                status_items.extend(["[h]elp", "[q]uit"])
+                status_bar = "  ".join(status_items)
+                print(f"\n{Colors.DIM}{status_bar}{Colors.RESET}", flush=True)
+
+                key = kb.get_key()
+
+                if key in ["q", "Q", "ESC", "CTRL_C", "CTRL_D"]:
+                    running = False
+                elif key in ["n", "N", "RIGHT", " "]:
+                    self.next_week()
+                elif key in ["p", "P", "LEFT"]:
+                    self.previous_week()
+                elif key in ["t", "T"]:
+                    self.go_to_today()
+                elif key in ["j", "J"]:
+                    self._jump_to_date(kb)
+                elif key in ["r", "R"]:
+                    self.refresh_events()
+                elif key in ["h", "H", "?"]:
+                    kb.show_help()
+                    kb.get_key()
+        finally:
+            # Always stop background refresh on exit
+            self._stop_background_refresh()
 
         kb.clear_screen()
 
