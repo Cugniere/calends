@@ -97,6 +97,7 @@ For more information, visit: https://github.com/anthropics/claude-code
     # Handle cache management commands
     if args.clear_cache:
         from .cache import Cache
+
         cache = Cache()
         cache.clear()
         print(f"{Colors.GREEN}✓{Colors.RESET} Cache cleared successfully")
@@ -105,15 +106,18 @@ For more information, visit: https://github.com/anthropics/claude-code
 
     if args.cache_info:
         from .cache import Cache
+
         cache = Cache()
         stats = cache.get_stats()
         print(f"{Colors.BOLD}Cache Information:{Colors.RESET}")
         print(f"  Location: {stats['cache_path']}")
-        print(f"  Exists: {Colors.GREEN if stats['cache_file_exists'] else Colors.RED}{stats['cache_file_exists']}{Colors.RESET}")
+        print(
+            f"  Exists: {Colors.GREEN if stats['cache_file_exists'] else Colors.RED}{stats['cache_file_exists']}{Colors.RESET}"
+        )
         print(f"  Total entries: {stats['total_entries']}")
         print(f"  Valid entries: {Colors.CYAN}{stats['valid_entries']}{Colors.RESET}")
-        if stats['total_entries'] > stats['valid_entries']:
-            expired = stats['total_entries'] - stats['valid_entries']
+        if stats["total_entries"] > stats["valid_entries"]:
+            expired = stats["total_entries"] - stats["valid_entries"]
             print(f"  Expired entries: {Colors.DIM}{expired}{Colors.RESET}")
         sys.exit(0)
 
@@ -124,7 +128,10 @@ For more information, visit: https://github.com/anthropics/claude-code
             start -= timedelta(days=start.weekday())
             start = start.replace(hour=0, minute=0)
         except ValueError as e:
-            print(f"Error: Invalid date format '{args.date}'. Use YYYY-MM-DD (e.g., 2025-01-15)", file=sys.stderr)
+            print(
+                f"Error: Invalid date format '{args.date}'. Use YYYY-MM-DD (e.g., 2025-01-15)",
+                file=sys.stderr,
+            )
             sys.exit(1)
         except Exception as e:
             print(f"Error: Failed to parse date: {e}", file=sys.stderr)
@@ -141,7 +148,10 @@ For more information, visit: https://github.com/anthropics/claude-code
             print(f"Error: Config file not found: {args.config}", file=sys.stderr)
             sys.exit(1)
         except PermissionError:
-            print(f"Error: Permission denied reading config file: {args.config}", file=sys.stderr)
+            print(
+                f"Error: Permission denied reading config file: {args.config}",
+                file=sys.stderr,
+            )
             sys.exit(1)
         except ValueError as e:
             print(f"Error: Invalid config file: {e}", file=sys.stderr)
@@ -157,7 +167,10 @@ For more information, visit: https://github.com/anthropics/claude-code
                 s, tz_str, cache_exp = load_config(default)
                 sources += s
             except Exception as e:
-                print(f"Warning: Failed to load config file {default}: {e}", file=sys.stderr)
+                print(
+                    f"Warning: Failed to load config file {default}: {e}",
+                    file=sys.stderr,
+                )
 
     if args.sources:
         sources += args.sources
@@ -175,9 +188,15 @@ For more information, visit: https://github.com/anthropics/claude-code
             if tz:
                 print(f"Using timezone: {tz_str}")
             else:
-                print(f"Warning: Could not parse timezone '{tz_str}', using local time", file=sys.stderr)
+                print(
+                    f"Warning: Could not parse timezone '{tz_str}', using local time",
+                    file=sys.stderr,
+                )
         except Exception as e:
-            print(f"Warning: Invalid timezone '{tz_str}': {e}. Using local time.", file=sys.stderr)
+            print(
+                f"Warning: Invalid timezone '{tz_str}': {e}. Using local time.",
+                file=sys.stderr,
+            )
 
     show_progress = not args.no_progress and sys.stderr.isatty()
 
@@ -201,10 +220,7 @@ For more information, visit: https://github.com/anthropics/claude-code
         refresh_callback = manager.reload_sources if args.interactive else None
 
         view: WeeklyView = WeeklyView(
-            manager.get_all_events(),
-            start,
-            tz,
-            refresh_callback=refresh_callback
+            manager.get_all_events(), start, tz, refresh_callback=refresh_callback
         )
 
         if args.interactive:

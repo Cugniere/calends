@@ -24,7 +24,9 @@ class WeeklyView:
         if self.start_date.tzinfo is None:
             self.start_date = self.start_date.replace(tzinfo=self.target_timezone)
         self.end_date: datetime = self.start_date + timedelta(days=7)
-        self.refresh_callback: Optional[Callable[[], list[EventDict]]] = refresh_callback
+        self.refresh_callback: Optional[Callable[[], list[EventDict]]] = (
+            refresh_callback
+        )
 
     def get_monday(self) -> datetime:
         """
@@ -191,16 +193,23 @@ class WeeklyView:
             return False
 
         try:
-            print(f"\n{Colors.CYAN}Refreshing calendar data...{Colors.RESET}", flush=True)
+            print(
+                f"\n{Colors.CYAN}Refreshing calendar data...{Colors.RESET}", flush=True
+            )
             new_events = self.refresh_callback()
             self.events = new_events
-            print(f"{Colors.GREEN}✓{Colors.RESET} Loaded {len(new_events)} events", flush=True)
+            print(
+                f"{Colors.GREEN}✓{Colors.RESET} Loaded {len(new_events)} events",
+                flush=True,
+            )
             import time
+
             time.sleep(0.5)
             return True
         except Exception as e:
             print(f"{Colors.RED}✗{Colors.RESET} Failed to refresh: {e}", flush=True)
             import time
+
             time.sleep(1.5)
             return False
 
@@ -232,19 +241,19 @@ class WeeklyView:
 
             key = kb.get_key()
 
-            if key in ['q', 'Q', 'ESC', 'CTRL_C', 'CTRL_D']:
+            if key in ["q", "Q", "ESC", "CTRL_C", "CTRL_D"]:
                 running = False
-            elif key in ['n', 'N', 'RIGHT', ' ']:
+            elif key in ["n", "N", "RIGHT", " "]:
                 self.next_week()
-            elif key in ['p', 'P', 'LEFT']:
+            elif key in ["p", "P", "LEFT"]:
                 self.previous_week()
-            elif key in ['t', 'T']:
+            elif key in ["t", "T"]:
                 self.go_to_today()
-            elif key in ['j', 'J']:
+            elif key in ["j", "J"]:
                 self._jump_to_date(kb)
-            elif key in ['r', 'R']:
+            elif key in ["r", "R"]:
                 self.refresh_events()
-            elif key in ['h', 'H', '?']:
+            elif key in ["h", "H", "?"]:
                 kb.show_help()
                 kb.get_key()
 
@@ -257,9 +266,14 @@ class WeeklyView:
         Args:
             kb: KeyboardInput instance
         """
-        print(f"\n{Colors.CYAN}Jump to date (YYYY-MM-DD): {Colors.RESET}", end='', flush=True)
+        print(
+            f"\n{Colors.CYAN}Jump to date (YYYY-MM-DD): {Colors.RESET}",
+            end="",
+            flush=True,
+        )
 
         import termios
+
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
         try:
@@ -271,7 +285,10 @@ class WeeklyView:
                 target_date = target_date.replace(tzinfo=self.target_timezone)
                 self.set_week(target_date)
             except ValueError:
-                print(f"{Colors.RED}Invalid date format. Press any key to continue...{Colors.RESET}", flush=True)
+                print(
+                    f"{Colors.RED}Invalid date format. Press any key to continue...{Colors.RESET}",
+                    flush=True,
+                )
                 kb.get_key()
         except (KeyboardInterrupt, EOFError):
             pass

@@ -58,7 +58,12 @@ class ICalFetcher:
             return cached
 
         if self.show_progress:
-            print(f"{Colors.BLUE}Fetching {url}...{Colors.RESET}", end="", file=sys.stderr, flush=True)
+            print(
+                f"{Colors.BLUE}Fetching {url}...{Colors.RESET}",
+                end="",
+                file=sys.stderr,
+                flush=True,
+            )
 
         try:
             req = Request(url, headers={"User-Agent": "calends/1.0"})
@@ -72,7 +77,9 @@ class ICalFetcher:
                     raise ValueError(f"Empty response from {url}")
 
                 if "BEGIN:VCALENDAR" not in content:
-                    raise ValueError(f"Response does not appear to be valid iCal format")
+                    raise ValueError(
+                        f"Response does not appear to be valid iCal format"
+                    )
 
                 self.cache.set(url, content)
 
@@ -92,7 +99,9 @@ class ICalFetcher:
             if self.show_progress:
                 print(f" {Colors.RED}✗{Colors.RESET}", file=sys.stderr)
             if "timed out" in str(e.reason).lower():
-                raise TimeoutError(f"Request timed out after {URL_FETCH_TIMEOUT}s: {url}")
+                raise TimeoutError(
+                    f"Request timed out after {URL_FETCH_TIMEOUT}s: {url}"
+                )
             else:
                 raise ConnectionError(f"Network error: {e.reason}")
         except UnicodeDecodeError as e:
@@ -143,7 +152,10 @@ class ICalFetcher:
                         return None
 
                     if "BEGIN:VCALENDAR" not in content:
-                        print(f"Error: File does not appear to be valid iCal format: {source}", file=sys.stderr)
+                        print(
+                            f"Error: File does not appear to be valid iCal format: {source}",
+                            file=sys.stderr,
+                        )
                         return None
 
                     return content
@@ -154,10 +166,16 @@ class ICalFetcher:
                     print(f"Error: Permission denied: {source}", file=sys.stderr)
                     return None
                 except UnicodeDecodeError:
-                    print(f"Error: File is not valid UTF-8 text: {source}", file=sys.stderr)
+                    print(
+                        f"Error: File is not valid UTF-8 text: {source}",
+                        file=sys.stderr,
+                    )
                     return None
                 except IsADirectoryError:
-                    print(f"Error: Path is a directory, not a file: {source}", file=sys.stderr)
+                    print(
+                        f"Error: Path is a directory, not a file: {source}",
+                        file=sys.stderr,
+                    )
                     return None
         except Exception as e:
             print(f"Error reading {source}: {e}", file=sys.stderr)

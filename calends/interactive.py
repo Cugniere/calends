@@ -26,25 +26,25 @@ class KeyboardInput:
             tty.setraw(fd)
             ch = sys.stdin.read(1)
 
-            if ch == '\x1b':
+            if ch == "\x1b":
                 ch2 = sys.stdin.read(1)
-                if ch2 == '[':
+                if ch2 == "[":
                     ch3 = sys.stdin.read(1)
-                    if ch3 == 'A':
-                        return 'UP'
-                    elif ch3 == 'B':
-                        return 'DOWN'
-                    elif ch3 == 'C':
-                        return 'RIGHT'
-                    elif ch3 == 'D':
-                        return 'LEFT'
-                return 'ESC'
-            elif ch == '\r' or ch == '\n':
-                return 'ENTER'
-            elif ch == '\x03':
-                return 'CTRL_C'
-            elif ch == '\x04':
-                return 'CTRL_D'
+                    if ch3 == "A":
+                        return "UP"
+                    elif ch3 == "B":
+                        return "DOWN"
+                    elif ch3 == "C":
+                        return "RIGHT"
+                    elif ch3 == "D":
+                        return "LEFT"
+                return "ESC"
+            elif ch == "\r" or ch == "\n":
+                return "ENTER"
+            elif ch == "\x03":
+                return "CTRL_C"
+            elif ch == "\x04":
+                return "CTRL_D"
             else:
                 return ch
         finally:
@@ -53,12 +53,13 @@ class KeyboardInput:
     @staticmethod
     def clear_screen() -> None:
         """Clear the terminal screen."""
-        print('\033[2J\033[H', end='', flush=True)
+        print("\033[2J\033[H", end="", flush=True)
 
     @staticmethod
     def show_help() -> None:
         """Display help for interactive navigation."""
         from .colors import Colors
+
         print(f"\n{Colors.BOLD}Interactive Navigation Help:{Colors.RESET}")
         print(f"{Colors.CYAN}  n, →, SPACE{Colors.RESET}  Next week")
         print(f"{Colors.CYAN}  p, ←{Colors.RESET}         Previous week")

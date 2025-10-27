@@ -54,7 +54,12 @@ class CalendarManager:
 
         if self.show_progress and not is_url:
             source_display = source if len(source) <= 60 else "..." + source[-57:]
-            print(f"{Colors.BLUE}Loading {source_display}...{Colors.RESET}", end="", file=sys.stderr, flush=True)
+            print(
+                f"{Colors.BLUE}Loading {source_display}...{Colors.RESET}",
+                end="",
+                file=sys.stderr,
+                flush=True,
+            )
 
         initial_count = self.events.count()
         content = self.fetcher.fetch(source)
@@ -67,9 +72,15 @@ class CalendarManager:
 
             if self.show_progress:
                 if is_url:
-                    print(f" {Colors.GREEN}✓{Colors.RESET} ({added_count} events)", file=sys.stderr)
+                    print(
+                        f" {Colors.GREEN}✓{Colors.RESET} ({added_count} events)",
+                        file=sys.stderr,
+                    )
                 else:
-                    print(f" {Colors.GREEN}✓{Colors.RESET} ({added_count} events)", file=sys.stderr)
+                    print(
+                        f" {Colors.GREEN}✓{Colors.RESET} ({added_count} events)",
+                        file=sys.stderr,
+                    )
 
     def load_sources(self, sources: list[str]) -> None:
         """
@@ -81,13 +92,19 @@ class CalendarManager:
         self.sources = sources
 
         if self.show_progress and len(sources) > 1:
-            print(f"{Colors.BOLD}Loading {len(sources)} calendar sources...{Colors.RESET}", file=sys.stderr)
+            print(
+                f"{Colors.BOLD}Loading {len(sources)} calendar sources...{Colors.RESET}",
+                file=sys.stderr,
+            )
 
         for source in sources:
             self.load_source(source)
 
         if self.show_progress and len(sources) > 1:
-            print(f"{Colors.BOLD}Loaded {self.count_events()} total events{Colors.RESET}\n", file=sys.stderr)
+            print(
+                f"{Colors.BOLD}Loaded {self.count_events()} total events{Colors.RESET}\n",
+                file=sys.stderr,
+            )
 
     def reload_sources(self) -> list[dict]:
         """

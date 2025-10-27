@@ -121,7 +121,9 @@ class ICalParser:
                 dt = dt.astimezone(self.target_timezone)
             return dt
         except Exception as e:
-            print(f"Warning: Failed to parse datetime '{dt_string}': {e}", file=sys.stderr)
+            print(
+                f"Warning: Failed to parse datetime '{dt_string}': {e}", file=sys.stderr
+            )
             return None
 
     def parse_rrule(self, rrule_line: str) -> Optional[dict[str, str]]:
@@ -215,7 +217,10 @@ class ICalParser:
         try:
             freq = rrule.get("FREQ")
             if not freq or freq not in ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]:
-                print(f"Warning: Unsupported or missing FREQ in RRULE: {freq}", file=sys.stderr)
+                print(
+                    f"Warning: Unsupported or missing FREQ in RRULE: {freq}",
+                    file=sys.stderr,
+                )
                 return [event]
 
             try:
@@ -223,7 +228,9 @@ class ICalParser:
                 if count <= 0:
                     count = max_instances
             except (ValueError, TypeError):
-                print(f"Warning: Invalid COUNT in RRULE, using default", file=sys.stderr)
+                print(
+                    f"Warning: Invalid COUNT in RRULE, using default", file=sys.stderr
+                )
                 count = max_instances
 
             try:
@@ -266,9 +273,12 @@ class ICalParser:
                         year = current_start.year + (month - 1) // 12
                         month = ((month - 1) % 12) + 1
                         try:
-                            current_start = current_start.replace(year=year, month=month)
+                            current_start = current_start.replace(
+                                year=year, month=month
+                            )
                         except ValueError:
                             import calendar
+
                             last_day = calendar.monthrange(year, month)[1]
                             current_start = current_start.replace(
                                 year=year, month=month, day=last_day
@@ -283,7 +293,10 @@ class ICalParser:
                                 year=current_start.year + interval, day=28
                             )
                 except (ValueError, OverflowError) as e:
-                    print(f"Warning: Failed to generate recurrence instance: {e}", file=sys.stderr)
+                    print(
+                        f"Warning: Failed to generate recurrence instance: {e}",
+                        file=sys.stderr,
+                    )
                     break
 
             return instances
@@ -308,7 +321,9 @@ class ICalParser:
             raise ValueError("Content must be a non-empty string")
 
         if "BEGIN:VCALENDAR" not in content:
-            raise ValueError("Content does not contain BEGIN:VCALENDAR - not valid iCal format")
+            raise ValueError(
+                "Content does not contain BEGIN:VCALENDAR - not valid iCal format"
+            )
 
         try:
             lines = self.unfold_lines(content)
@@ -332,9 +347,14 @@ class ICalParser:
                                 else:
                                     events.append(event)
                             else:
-                                print(f"Warning: Skipping event without start time: {event.get('summary', 'Untitled')}", file=sys.stderr)
+                                print(
+                                    f"Warning: Skipping event without start time: {event.get('summary', 'Untitled')}",
+                                    file=sys.stderr,
+                                )
                         except Exception as e:
-                            print(f"Warning: Failed to parse event: {e}", file=sys.stderr)
+                            print(
+                                f"Warning: Failed to parse event: {e}", file=sys.stderr
+                            )
                     in_event = False
                 elif in_event:
                     event_lines.append(line)
