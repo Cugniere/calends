@@ -37,6 +37,7 @@ class WeeklyView:
         self._refresh_thread: Optional[threading.Thread] = None
         self._stop_refresh: threading.Event = threading.Event()
         self._needs_redraw: threading.Event = threading.Event()
+        self._selected_event_index: int = 0
 
     def get_monday(self) -> datetime:
         """
@@ -94,7 +95,73 @@ class WeeklyView:
     def truncate(self, text: str, n: int) -> str:
         return text if len(text) <= n else text[: n - 3] + "..."
 
-    def display(self) -> None:
+    def _get_all_week_events(self) -> list[EventDict]:
+        """
+        Get all events for the current week in chronological order.
+
+        Returns:
+            List of events sorted by start time
+        """
+        week = self.filter_events_for_week()
+        all_events = []
+        # Get days in order from Monday to Sunday
+        for i in range(7):
+            day_date = (self.start_date + timedelta(days=i)).date()
+            if day_date in week:
+                all_events.extend(week[day_date])
+        return all_events
+
+    def _display_event_details(self, event: EventDict) -> None:
+        """
+        Display detailed information about an event.
+
+        Args:
+            event: Event dictionary to display
+        """
+        print(f"\n{Colors.BOLD}{'─'*80}{Colors.RESET}")
+        print(f"{Colors.BOLD}{Colors.CYAN}Event Details:{Colors.RESET}")
+        print(f"{Colors.BOLD}{'─'*80}{Colors.RESET}")
+
+        # Title
+        print(f"{Colors.BOLD}Title:{Colors.RESET} {event['summary']}")
+
+        # Calendar name
+        if event.get("calendar_name"):
+            print(f"{Colors.BOLD}Calendar:{Colors.RESET} {event['calendar_name']}")
+
+        # Time
+        start_time = event["start"].strftime("%A, %B %d, %Y at %H:%M")
+        end_time = event["end"].strftime("%H:%M")
+        if event["start"].date() != event["end"].date():
+            end_time = event["end"].strftime("%A, %B %d, %Y at %H:%M")
+        print(f"{Colors.BOLD}Time:{Colors.RESET} {start_time} - {end_time}")
+
+        # Location
+        if event.get("location"):
+            print(f"{Colors.BOLD}Location:{Colors.RESET} {event['location']}")
+
+        # Description
+        if event.get("description"):
+            desc = event["description"].strip()
+            if desc:
+                # Strip HTML tags from description
+                import re
+
+                desc = re.sub(r"<[^>]+>", "", desc)
+                desc = desc.strip()
+                if desc:
+                    print(f"{Colors.BOLD}Description:{Colors.RESET}")
+                    # Wrap description text to 76 chars
+                    import textwrap
+
+                    wrapped = textwrap.fill(
+                        desc, width=76, initial_indent="  ", subsequent_indent="  "
+                    )
+                    print(wrapped)
+
+        print(f"{Colors.BOLD}{'─'*80}{Colors.RESET}")
+
+    def display(self, selected_event_index: Optional[int] = None) -> None:
         week = self.filter_events_for_week()
         now = datetime.now(self.target_timezone)
         week_number = self.start_date.isocalendar().week
@@ -112,6 +179,10 @@ class WeeklyView:
             "Saturday",
             "Sunday",
         ]
+
+        # Track global event index for selection
+        event_counter = 0
+
         for i, dname in enumerate(days):
             current = self.start_date + timedelta(days=i)
             key = current.date()
@@ -123,6 +194,11 @@ class WeeklyView:
             print(f"{Colors.DIM}{'-'*80}{Colors.RESET}")
             if key in week:
                 for e in week[key]:
+                    is_selected = (
+                        selected_event_index is not None
+                        and event_counter == selected_event_index
+                    )
+                    selection_marker = "▶ " if is_selected else "  "
                     start, end = self.format_time(e["start"]), self.format_time(
                         e["end"]
                     )
@@ -138,7 +214,7 @@ class WeeklyView:
                         bg_color = Colors.BG_RED
                         text_color = Colors.BOLD
                         # Build the line and pad to 80 chars
-                        line = f"  {time_range:<15}{e['summary']}"
+                        line = f"{selection_marker}{time_range:<15}{e['summary']}"
                         line = line.ljust(80)
                         print(f"{bg_color}{text_color}{line}{Colors.RESET}")
                         if e["location"]:
@@ -147,7 +223,7 @@ class WeeklyView:
                             print(f"{bg_color}{Colors.CYAN}{loc_line}{Colors.RESET}")
                     elif event_end < now:
                         print(
-                            f"{Colors.DIM}  {time_range:<15}{Colors.RESET}{e['summary']}{Colors.RESET}"
+                            f"{Colors.DIM}{selection_marker}{time_range:<15}{Colors.RESET}{e['summary']}{Colors.RESET}"
                         )
                         if e["location"]:
                             print(
@@ -155,12 +231,14 @@ class WeeklyView:
                             )
                     else:
                         print(
-                            f"{Colors.BLUE}  {time_range:<15}{Colors.RESET}{e['summary']}{Colors.RESET}"
+                            f"{Colors.BLUE}{selection_marker}{time_range:<15}{Colors.RESET}{e['summary']}{Colors.RESET}"
                         )
                         if e["location"]:
                             print(
                                 f"{Colors.CYAN}                   ⚲ {self.truncate(e['location'],60)}{Colors.RESET}"
                             )
+
+                    event_counter += 1
             else:
                 print(f"{Colors.DIM}  No events{Colors.RESET}")
         total = sum(len(v) for v in week.values())
@@ -286,33 +364,72 @@ class WeeklyView:
                 # Check if background refresh triggered a redraw
                 if self._needs_redraw.is_set():
                     self._needs_redraw.clear()
-                    # Continue to redraw
+                    # Reset selection when events refresh
+                    self._selected_event_index = 0
+
+                # Get current week events for navigation
+                all_events = self._get_all_week_events()
+                total_events = len(all_events)
+
+                # Clamp selected index
+                if total_events > 0:
+                    self._selected_event_index = max(
+                        0, min(self._selected_event_index, total_events - 1)
+                    )
+                else:
+                    self._selected_event_index = 0
 
                 kb.clear_screen()
-                self.display()
+                self.display(self._selected_event_index if total_events > 0 else None)
 
                 # Build status bar based on available features
-                status_items = ["[n]ext", "[p]revious", "[t]oday", "[j]ump"]
+                status_items = [
+                    "[↑↓]select",
+                    "[n]ext",
+                    "[p]revious",
+                    "[t]oday",
+                    "[j]ump",
+                ]
                 if self.refresh_callback:
                     status_items.append("[r]efresh")
                 status_items.extend(["[h]elp", "[q]uit"])
                 status_bar = "  ".join(status_items)
                 print(f"\n{Colors.DIM}{status_bar}{Colors.RESET}", flush=True)
 
+                # Display selected event details
+                if total_events > 0 and 0 <= self._selected_event_index < total_events:
+                    selected_event = all_events[self._selected_event_index]
+                    self._display_event_details(selected_event)
+
                 key = kb.get_key()
 
                 if key in ["q", "Q", "ESC", "CTRL_C", "CTRL_D"]:
                     running = False
+                elif key in ["UP"]:
+                    if total_events > 0:
+                        self._selected_event_index = (
+                            self._selected_event_index - 1
+                        ) % total_events
+                elif key in ["DOWN"]:
+                    if total_events > 0:
+                        self._selected_event_index = (
+                            self._selected_event_index + 1
+                        ) % total_events
                 elif key in ["n", "N", "RIGHT", " "]:
                     self.next_week()
+                    self._selected_event_index = 0
                 elif key in ["p", "P", "LEFT"]:
                     self.previous_week()
+                    self._selected_event_index = 0
                 elif key in ["t", "T"]:
                     self.go_to_today()
+                    self._selected_event_index = 0
                 elif key in ["j", "J"]:
                     self._jump_to_date(kb)
+                    self._selected_event_index = 0
                 elif key in ["r", "R"]:
                     self.refresh_events()
+                    self._selected_event_index = 0
                 elif key in ["h", "H", "?"]:
                     kb.show_help()
                     kb.get_key()

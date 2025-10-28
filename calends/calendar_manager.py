@@ -84,6 +84,9 @@ class CalendarManager:
 
         if content:
             parsed_events = self.parser.parse_ical_content(content)
+            # Attach calendar name to each event
+            for event in parsed_events:
+                event["calendar_name"] = source_display
             self.events.add_events(parsed_events)
             self.events.expand_multiday_events()
             added_count = self.events.count() - initial_count
@@ -135,6 +138,10 @@ class CalendarManager:
 
                     initial_count = self.events.count()
                     parsed_events = self.parser.parse_ical_content(content)
+                    # Attach calendar name to each event
+                    source_display = self._get_display_name(source)
+                    for event in parsed_events:
+                        event["calendar_name"] = source_display
                     self.events.add_events(parsed_events)
                     self.events.expand_multiday_events()
                     added_count = self.events.count() - initial_count
@@ -199,6 +206,10 @@ class CalendarManager:
                         content = all_contents.get(source)
                         if content:
                             parsed_events = self.parser.parse_ical_content(content)
+                            # Attach calendar name to each event
+                            source_display = self._get_display_name(source)
+                            for event in parsed_events:
+                                event["calendar_name"] = source_display
                             self.events.add_events(parsed_events)
 
                     self.events.expand_multiday_events()

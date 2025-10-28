@@ -61,6 +61,7 @@ class KeyboardInput:
         from .colors import Colors
 
         print(f"\n{Colors.BOLD}Interactive Navigation Help:{Colors.RESET}")
+        print(f"{Colors.CYAN}  ↑, ↓{Colors.RESET}         Navigate events (up/down)")
         print(f"{Colors.CYAN}  n, →, SPACE{Colors.RESET}  Next week")
         print(f"{Colors.CYAN}  p, ←{Colors.RESET}         Previous week")
         print(f"{Colors.CYAN}  t{Colors.RESET}            Today (current week)")
