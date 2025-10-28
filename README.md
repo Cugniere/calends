@@ -54,7 +54,7 @@ The event details panel shows:
 ┌─────────────────────────────── Event Details ────────────────────────────────┐
 │ Title: Team Meeting                                                          │
 │ Calendar: Work                                                               │
-│ Time: Monday, October 27, 2025 at 14:00 - 15:00                             │
+│ Time: Monday, October 27, 2025 at 14:00 - 15:00                              │
 │ Location: Conference Room A                                                  │
 │ Attendees: Alice, Bob, Charlie                                               │
 │ Description: Weekly team sync to discuss project progress                    │
