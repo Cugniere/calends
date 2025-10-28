@@ -162,6 +162,11 @@ class WeeklyView:
         if event.get("location"):
             lines.extend(wrap_field("Location:", event["location"]))
 
+        # Attendees
+        if event.get("attendees") and len(event["attendees"]) > 0:
+            attendees_str = ", ".join(event["attendees"])
+            lines.extend(wrap_field("Attendees:", attendees_str))
+
         # Description
         if event.get("description"):
             desc = event["description"].strip()

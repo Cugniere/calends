@@ -147,6 +147,40 @@ class ICalParser:
                 rules[key] = value
         return rules
 
+    def parse_attendee(self, attendee_line: str) -> Optional[str]:
+        """
+        Parse an iCal ATTENDEE line.
+
+        Args:
+            attendee_line: ATTENDEE line from iCal file
+
+        Returns:
+            Formatted attendee string (name or email), or None if parsing fails
+        """
+        if not attendee_line.startswith("ATTENDEE"):
+            return None
+
+        try:
+            # Extract CN (Common Name) if present
+            cn_match = re.search(r"CN=([^;:]+)", attendee_line)
+            if cn_match:
+                name = cn_match.group(1)
+                # Remove quotes if present
+                name = name.strip('"')
+                return name
+
+            # If no CN, extract email from mailto:
+            if ":mailto:" in attendee_line.lower():
+                email = attendee_line.split(":mailto:", 1)[1].strip()
+                return email
+            elif attendee_line.count(":") >= 2:
+                email = attendee_line.split(":", 2)[2].strip()
+                return email
+
+            return None
+        except Exception:
+            return None
+
     def parse_event(self, lines: list[str]) -> EventDict:
         """
         Parse iCal event lines into an event dictionary.
@@ -164,6 +198,7 @@ class ICalParser:
             "location": "",
             "description": "",
             "rrule": None,
+            "attendees": [],
         }
         for line in lines:
             if line.startswith("SUMMARY:"):
@@ -178,6 +213,10 @@ class ICalParser:
                 event["description"] = line[12:]
             elif line.startswith("RRULE:"):
                 event["rrule"] = self.parse_rrule(line)
+            elif line.startswith("ATTENDEE"):
+                attendee = self.parse_attendee(line)
+                if attendee:
+                    event["attendees"].append(attendee)
 
         if event["start"] and not event["start"].tzinfo:
             event["start"] = event["start"].replace(tzinfo=self.target_timezone)

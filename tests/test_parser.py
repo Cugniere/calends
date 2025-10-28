@@ -187,6 +187,40 @@ class TestExpandMultidayEvents:
         assert collection.events[0]["summary"] == "Meeting"
 
 
+class TestParseAttendee:
+    def test_parse_attendee_with_cn(self):
+        parser = ICalParser()
+        line = "ATTENDEE;CN=John Doe;RSVP=TRUE:mailto:john@example.com"
+
+        result = parser.parse_attendee(line)
+
+        assert result == "John Doe"
+
+    def test_parse_attendee_with_quoted_cn(self):
+        parser = ICalParser()
+        line = 'ATTENDEE;CN="Jane Smith";RSVP=TRUE:mailto:jane@example.com'
+
+        result = parser.parse_attendee(line)
+
+        assert result == "Jane Smith"
+
+    def test_parse_attendee_email_only(self):
+        parser = ICalParser()
+        line = "ATTENDEE;RSVP=TRUE:mailto:user@example.com"
+
+        result = parser.parse_attendee(line)
+
+        assert result == "user@example.com"
+
+    def test_parse_invalid_attendee(self):
+        parser = ICalParser()
+        line = "LOCATION:Conference Room"
+
+        result = parser.parse_attendee(line)
+
+        assert result is None
+
+
 class TestUnfoldLines:
     def test_unfold_continuation_line(self):
         parser = ICalParser()

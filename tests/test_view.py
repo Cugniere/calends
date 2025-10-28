@@ -293,3 +293,23 @@ class TestEventNavigation:
         for line in lines:
             clean_line = ansi_escape.sub("", line)
             assert len(clean_line) <= 80, f"Line exceeds 80 chars: {clean_line}"
+
+    def test_display_event_details_with_attendees(self, capsys):
+        """Test displaying event with attendees."""
+        event = {
+            "start": datetime(2025, 10, 23, 14, 0, 0, tzinfo=timezone.utc),
+            "end": datetime(2025, 10, 23, 15, 0, 0, tzinfo=timezone.utc),
+            "summary": "Team Meeting",
+            "location": "Conference Room",
+            "description": "",
+            "attendees": ["Alice", "Bob", "Charlie"],
+        }
+        view = WeeklyView([], target_timezone=timezone.utc)
+
+        view._display_event_details(event)
+
+        captured = capsys.readouterr()
+        assert "Attendees:" in captured.out
+        assert "Alice" in captured.out
+        assert "Bob" in captured.out
+        assert "Charlie" in captured.out
