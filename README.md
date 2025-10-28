@@ -2,59 +2,7 @@
 
 A minimalist terminal calendar that displays your iCal events in a clean weekly view with support for recurring events, timezones, and remote calendars.
 
-```
-      ════════════════════════════════════════════════════════════════════════════════
-                                  Week 43, October 2025
-      ════════════════════════════════════════════════════════════════════════════════
-
-
-      Monday, Oct 20
-      ────────────────────────────────────────────────────────────────────────────────
-        No events
-
-      Tuesday, Oct 21
-      ────────────────────────────────────────────────────────────────────────────────
-        14:40 - 15:40  Catch up with Daniel
-        15:40 - 16:40  Prepare meetup Low-Code/No-Code
-        18:30 - 20:30  Meetup Low-Code/No-Code
-
-      Wednesday, Oct 22
-      ────────────────────────────────────────────────────────────────────────────────
-        18:30 - 21:30  Dinner at Gabriel's
-
-      Thursday, Oct 23
-      ────────────────────────────────────────────────────────────────────────────────
-        All day        Work from home
-        12:00 - 13:00  Lunch with Mitzy
-        15:15 - 16:15  Dentist appointment
-
-      Friday, Oct 24
-      ────────────────────────────────────────────────────────────────────────────────
-      ▶ 14:30 - 15:30  Dentist appointment
-                        ⚲ 36, rue du Louvre, Paris (75001)
-
-      Saturday, Oct 25
-      ────────────────────────────────────────────────────────────────────────────────
-        11:30 - 12:30  Lunch with Alexander
-
-      Sunday, Oct 26
-      ────────────────────────────────────────────────────────────────────────────────
-        No events
-
-      ════════════════════════════════════════════════════════════════════════════════
-                                      Total events: 9
-
-        [↑↓]select  [n]ext  [p]revious  [t]oday  [j]ump  [r]efresh  [h]elp  [q]uit
-
-      ┌─────────────────────────────── Event Details ────────────────────────────────┐
-      │ Title: Day                                                                   │
-      │ Calendar: Personal                                                           │
-      │ Time: Friday, October 24, 2025 at 14:30 - 15:30                              │
-      │ Location: 36, rue du Louvre, Paris (75001)                                   │
-      │ Description: 36, rue du Louvre, Paris, France                                │
-      │              2nd floor, door on the left                                     │
-      └──────────────────────────────────────────────────────────────────────────────┘
-```
+![Demo Animation](../assets/calends.png?raw=true)
 
 ## Installation
 
