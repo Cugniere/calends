@@ -142,7 +142,10 @@ class TestCacheMetadata:
         cache_path = temp_cache_dir / "metadata_test.pkl"
         cache = Cache(path=str(cache_path))
         content = "test content"
-        metadata = {"etag": '"abc123"', "last_modified": "Wed, 21 Oct 2015 07:28:00 GMT"}
+        metadata = {
+            "etag": '"abc123"',
+            "last_modified": "Wed, 21 Oct 2015 07:28:00 GMT",
+        }
 
         cache.set("test_key", content, metadata)
 

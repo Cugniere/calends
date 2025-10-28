@@ -423,7 +423,7 @@ class TestRefreshIfChanged:
     def test_refresh_unchanged_url(self, mock_urlopen, tmp_path):
         """Test that unchanged URLs are detected."""
         ical_content = "BEGIN:VCALENDAR\nEND:VCALENDAR"
-        
+
         # First fetch
         mock_response = Mock()
         mock_response.status = 200
@@ -435,15 +435,15 @@ class TestRefreshIfChanged:
 
         fetcher = ICalFetcher(show_progress=False)
         url = "https://example.com/unchanged-refresh.ics"
-        
+
         # Initial fetch
         fetcher.fetch_from_url(url)
-        
+
         # Second fetch - simulate 304 Not Modified
         mock_response.status = 304
-        
+
         results, changed = fetcher.refresh_if_changed([url])
-        
+
         assert url in results
         assert url not in changed  # URL not in changed list
         assert results[url] is not None
@@ -493,15 +493,15 @@ class TestRefreshIfChanged:
         test_file.write_text("BEGIN:VCALENDAR\nORIGINAL\nEND:VCALENDAR")
 
         fetcher = ICalFetcher(show_progress=False)
-        
+
         # Initial fetch
         fetcher.fetch(str(test_file))
-        
+
         # Modify file
         test_file.write_text("BEGIN:VCALENDAR\nMODIFIED\nEND:VCALENDAR")
-        
+
         results, changed = fetcher.refresh_if_changed([str(test_file)])
-        
+
         assert str(test_file) in results
         assert str(test_file) in changed
         assert "MODIFIED" in results[str(test_file)]
@@ -530,7 +530,7 @@ class TestRefreshIfChanged:
         # Create file
         test_file = tmp_path / "test.ics"
         test_file.write_text("BEGIN:VCALENDAR\nFILE\nEND:VCALENDAR")
-        
+
         # Mock URL
         mock_response = Mock()
         mock_response.status = 200
@@ -542,16 +542,16 @@ class TestRefreshIfChanged:
 
         fetcher = ICalFetcher(show_progress=False)
         url = "https://example.com/mixed-refresh.ics"
-        
+
         # Initial fetches
         fetcher.fetch(str(test_file))
         fetcher.fetch_from_url(url)
-        
+
         # Modify only the file
         test_file.write_text("BEGIN:VCALENDAR\nFILE_MODIFIED\nEND:VCALENDAR")
-        
+
         results, changed = fetcher.refresh_if_changed([str(test_file), url])
-        
+
         assert len(results) == 2
         assert len(changed) == 1  # Only file changed
         assert str(test_file) in changed

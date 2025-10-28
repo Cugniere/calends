@@ -125,7 +125,9 @@ class TestRefreshCallback:
         def mock_callback():
             return new_events
 
-        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=mock_callback)
+        view = WeeklyView(
+            events, target_timezone=timezone.utc, refresh_callback=mock_callback
+        )
 
         assert len(view.events) == 1
         assert view.events[0]["summary"] == "Old Event"
@@ -172,7 +174,9 @@ class TestRefreshCallback:
             }
         ]
 
-        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=failing_callback)
+        view = WeeklyView(
+            events, target_timezone=timezone.utc, refresh_callback=failing_callback
+        )
 
         original_count = len(view.events)
         result = view.refresh_events()
@@ -196,7 +200,9 @@ class TestRefreshCallback:
             }
         ]
 
-        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=empty_callback)
+        view = WeeklyView(
+            events, target_timezone=timezone.utc, refresh_callback=empty_callback
+        )
 
         result = view.refresh_events()
 
@@ -341,7 +347,12 @@ class TestBackgroundRefresh:
         def mock_callback():
             return []
 
-        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=mock_callback, auto_refresh_interval=0)
+        view = WeeklyView(
+            events,
+            target_timezone=timezone.utc,
+            refresh_callback=mock_callback,
+            auto_refresh_interval=0,
+        )
 
         view._start_background_refresh()
         assert view._refresh_thread is None
@@ -349,7 +360,12 @@ class TestBackgroundRefresh:
     def test_background_refresh_disabled_without_callback(self):
         """Test that background refresh is not started without a refresh callback."""
         events = []
-        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=None, auto_refresh_interval=60)
+        view = WeeklyView(
+            events,
+            target_timezone=timezone.utc,
+            refresh_callback=None,
+            auto_refresh_interval=60,
+        )
 
         view._start_background_refresh()
         assert view._refresh_thread is None
@@ -363,7 +379,12 @@ class TestBackgroundRefresh:
             refresh_count["count"] += 1
             return []
 
-        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=mock_callback, auto_refresh_interval=1)
+        view = WeeklyView(
+            events,
+            target_timezone=timezone.utc,
+            refresh_callback=mock_callback,
+            auto_refresh_interval=1,
+        )
 
         view._start_background_refresh()
 
@@ -402,7 +423,7 @@ class TestBackgroundRefresh:
             initial_events,
             target_timezone=timezone.utc,
             refresh_callback=mock_callback,
-            auto_refresh_interval=1
+            auto_refresh_interval=1,
         )
 
         view._start_background_refresh()
@@ -426,7 +447,12 @@ class TestBackgroundRefresh:
         def mock_callback():
             return []
 
-        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=mock_callback, auto_refresh_interval=1)
+        view = WeeklyView(
+            events,
+            target_timezone=timezone.utc,
+            refresh_callback=mock_callback,
+            auto_refresh_interval=1,
+        )
 
         assert not view._needs_redraw.is_set()
 
@@ -446,7 +472,12 @@ class TestBackgroundRefresh:
         def mock_callback():
             return []
 
-        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=mock_callback, auto_refresh_interval=1)
+        view = WeeklyView(
+            events,
+            target_timezone=timezone.utc,
+            refresh_callback=mock_callback,
+            auto_refresh_interval=1,
+        )
 
         view._start_background_refresh()
         assert view._refresh_thread.is_alive()
@@ -466,7 +497,12 @@ class TestBackgroundRefresh:
             refresh_calls.append({"silent": True})
             return []
 
-        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=mock_callback, auto_refresh_interval=1)
+        view = WeeklyView(
+            events,
+            target_timezone=timezone.utc,
+            refresh_callback=mock_callback,
+            auto_refresh_interval=1,
+        )
 
         view._start_background_refresh()
 
@@ -489,7 +525,12 @@ class TestBackgroundRefresh:
                 raise Exception("Simulated network error")
             return []
 
-        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=failing_callback, auto_refresh_interval=1)
+        view = WeeklyView(
+            events,
+            target_timezone=timezone.utc,
+            refresh_callback=failing_callback,
+            auto_refresh_interval=1,
+        )
 
         view._start_background_refresh()
 
@@ -511,7 +552,9 @@ class TestBackgroundRefresh:
         def mock_callback():
             return []
 
-        view = WeeklyView(events, target_timezone=timezone.utc, refresh_callback=mock_callback)
+        view = WeeklyView(
+            events, target_timezone=timezone.utc, refresh_callback=mock_callback
+        )
 
         # Test silent refresh (should not print anything)
         result = view.refresh_events(silent=True)
@@ -529,7 +572,7 @@ class TestBackgroundRefresh:
         class MockManager:
             def __init__(self):
                 self.show_progress = True
-                self.fetcher = type('obj', (object,), {'show_progress': True})()
+                self.fetcher = type("obj", (object,), {"show_progress": True})()
 
         manager = MockManager()
 
@@ -543,7 +586,7 @@ class TestBackgroundRefresh:
             events,
             target_timezone=timezone.utc,
             refresh_callback=mock_callback,
-            calendar_manager=manager
+            calendar_manager=manager,
         )
 
         # Initially, show_progress should be True

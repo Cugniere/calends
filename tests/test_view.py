@@ -274,6 +274,7 @@ class TestEventNavigation:
     def test_display_event_details_wraps_long_lines(self, capsys):
         """Test that long lines are wrapped properly within the box."""
         import re
+
         event = {
             "start": datetime(2025, 11, 2, 0, 0, 0, tzinfo=timezone.utc),
             "end": datetime(2025, 11, 3, 0, 0, 0, tzinfo=timezone.utc),
@@ -287,8 +288,8 @@ class TestEventNavigation:
         view._display_event_details(event)
 
         captured = capsys.readouterr()
-        lines = captured.out.split('\n')
-        ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
+        lines = captured.out.split("\n")
+        ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
         for line in lines:
-            clean_line = ansi_escape.sub('', line)
+            clean_line = ansi_escape.sub("", line)
             assert len(clean_line) <= 80, f"Line exceeds 80 chars: {clean_line}"

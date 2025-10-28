@@ -289,7 +289,7 @@ class TestCalendarAliases:
         """Test that aliases are stored correctly on init."""
         aliases = {
             "https://work.example.com/cal.ics": "Work",
-            "/path/to/personal.ics": "Personal"
+            "/path/to/personal.ics": "Personal",
         }
         manager = CalendarManager(aliases=aliases, show_progress=False)
 
@@ -303,9 +303,7 @@ class TestCalendarAliases:
 
     def test_get_display_name_with_alias(self):
         """Test that _get_display_name returns alias when available."""
-        aliases = {
-            "https://work.example.com/cal.ics": "Work Calendar"
-        }
+        aliases = {"https://work.example.com/cal.ics": "Work Calendar"}
         manager = CalendarManager(aliases=aliases, show_progress=False)
 
         display_name = manager._get_display_name("https://work.example.com/cal.ics")
@@ -369,10 +367,7 @@ END:VCALENDAR"""
         file1.write_text(ical_content)
         file2.write_text(ical_content)
 
-        aliases = {
-            str(file1): "Work",
-            str(file2): "Personal"
-        }
+        aliases = {str(file1): "Work", str(file2): "Personal"}
         manager = CalendarManager(aliases=aliases, show_progress=True)
         manager.load_sources([str(file1), str(file2)])
 

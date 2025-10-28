@@ -67,7 +67,7 @@ class TestLoadConfig:
         config_data = {
             "calendars": {
                 "Work": "https://work.example.com/cal.ics",
-                "Personal": "/path/to/personal.ics"
+                "Personal": "/path/to/personal.ics",
             },
             "timezone": "UTC",
             "cache_expiration": 3600,
@@ -88,11 +88,7 @@ class TestLoadConfig:
     def test_load_config_with_aliases_dict_defaults(self, tmp_path):
         """Test loading config with aliases and default values."""
         config_file = tmp_path / "config.json"
-        config_data = {
-            "calendars": {
-                "MyCalendar": "calendar.ics"
-            }
-        }
+        config_data = {"calendars": {"MyCalendar": "calendar.ics"}}
         config_file.write_text(json.dumps(config_data))
 
         calendars, timezone_str, cache_exp, aliases = load_config(str(config_file))
@@ -114,11 +110,7 @@ class TestLoadConfig:
     def test_load_config_invalid_alias_value(self, tmp_path):
         """Test that non-string calendar source raises error."""
         config_file = tmp_path / "config.json"
-        config_data = {
-            "calendars": {
-                "BadCalendar": 123
-            }
-        }
+        config_data = {"calendars": {"BadCalendar": 123}}
         config_file.write_text(json.dumps(config_data))
 
         with pytest.raises(ValueError, match="must be a string"):

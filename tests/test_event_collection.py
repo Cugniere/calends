@@ -133,8 +133,12 @@ class TestExpandMultidayEvents:
         # This appears to be the intended behavior based on the implementation
         assert collection.count() == 1
         assert collection.events[0]["summary"] == "Two Day Event"
-        assert collection.events[0]["start"] == datetime(2025, 1, 15, 14, 0, tzinfo=timezone.utc)
-        assert collection.events[0]["end"] == datetime(2025, 1, 16, 0, 0, tzinfo=timezone.utc)
+        assert collection.events[0]["start"] == datetime(
+            2025, 1, 15, 14, 0, tzinfo=timezone.utc
+        )
+        assert collection.events[0]["end"] == datetime(
+            2025, 1, 16, 0, 0, tzinfo=timezone.utc
+        )
         assert collection.events[0]["location"] == "Office"
 
     def test_expand_three_day_event(self):
@@ -154,12 +158,20 @@ class TestExpandMultidayEvents:
         assert collection.count() == 2
 
         # Day 1: 9:00 to midnight
-        assert collection.events[0]["start"] == datetime(2025, 1, 15, 9, 0, tzinfo=timezone.utc)
-        assert collection.events[0]["end"] == datetime(2025, 1, 16, 0, 0, tzinfo=timezone.utc)
+        assert collection.events[0]["start"] == datetime(
+            2025, 1, 15, 9, 0, tzinfo=timezone.utc
+        )
+        assert collection.events[0]["end"] == datetime(
+            2025, 1, 16, 0, 0, tzinfo=timezone.utc
+        )
 
         # Day 2-3: midnight to 17:00 on day 3
-        assert collection.events[1]["start"] == datetime(2025, 1, 16, 0, 0, tzinfo=timezone.utc)
-        assert collection.events[1]["end"] == datetime(2025, 1, 17, 17, 0, tzinfo=timezone.utc)
+        assert collection.events[1]["start"] == datetime(
+            2025, 1, 16, 0, 0, tzinfo=timezone.utc
+        )
+        assert collection.events[1]["end"] == datetime(
+            2025, 1, 17, 17, 0, tzinfo=timezone.utc
+        )
 
     def test_expand_single_day_event_unchanged(self):
         """Test that single-day events are not modified."""
