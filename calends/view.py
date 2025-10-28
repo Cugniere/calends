@@ -191,11 +191,11 @@ class WeeklyView:
         week = self.filter_events_for_week()
         now = datetime.now(self.target_timezone)
         week_number = self.start_date.isocalendar().week
-        print(f"\n{Colors.BOLD}{'='*80}{Colors.RESET}")
-        print(
-            f"{Colors.BOLD}{Colors.CYAN}Week {week_number}, {self.start_date.strftime('%B %Y')}{Colors.RESET}"
-        )
-        print(f"{Colors.BOLD}{'='*80}{Colors.RESET}\n")
+        week_title = f"Week {week_number}, {self.start_date.strftime('%B %Y')}"
+        centered_title = week_title.center(80)
+        print(f"\n{Colors.BOLD}{'═'*80}{Colors.RESET}")
+        print(f"{Colors.BOLD}{Colors.CYAN}{centered_title}{Colors.RESET}")
+        print(f"{Colors.BOLD}{'═'*80}{Colors.RESET}\n")
         days = [
             "Monday",
             "Tuesday",
@@ -217,7 +217,7 @@ class WeeklyView:
             day_color = Colors.DIM if is_past else Colors.WHITE
             header = f"{Colors.GREEN if is_today else day_color}{dname}, {current.strftime('%b %d')}{Colors.RESET}"
             print(f"\n{Colors.BOLD}{header}{Colors.RESET}")
-            print(f"{Colors.DIM}{'-'*80}{Colors.RESET}")
+            print(f"{Colors.DIM}{'─'*80}{Colors.RESET}")
             if key in week:
                 for e in week[key]:
                     is_selected = (
@@ -268,8 +268,10 @@ class WeeklyView:
             else:
                 print(f"{Colors.DIM}  No events{Colors.RESET}")
         total = sum(len(v) for v in week.values())
-        print(f"\n{Colors.BOLD}{'='*80}{Colors.RESET}")
-        print(f"{Colors.BOLD}Total events: {total}{Colors.RESET}")
+        total_text = f"Total events: {total}"
+        centered_total = total_text.center(80)
+        print(f"\n{Colors.BOLD}{'═'*80}{Colors.RESET}")
+        print(f"{Colors.BOLD}{centered_total}{Colors.RESET}")
 
     def set_week(self, start_date: datetime) -> None:
         """
@@ -420,7 +422,8 @@ class WeeklyView:
                     status_items.append("[r]efresh")
                 status_items.extend(["[h]elp", "[q]uit"])
                 status_bar = "  ".join(status_items)
-                print(f"\n{Colors.DIM}{status_bar}{Colors.RESET}", flush=True)
+                centered_bar = status_bar.center(80)
+                print(f"\n{Colors.DIM}{centered_bar}{Colors.RESET}", flush=True)
 
                 # Display selected event details
                 if total_events > 0 and 0 <= self._selected_event_index < total_events:
