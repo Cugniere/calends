@@ -154,7 +154,9 @@ class WeeklyView:
 
         # Calendar name
         if event.get("calendar_name"):
-            lines.extend(wrap_field("Calendar:", event["calendar_name"], max_label_width))
+            lines.extend(
+                wrap_field("Calendar:", event["calendar_name"], max_label_width)
+            )
 
         # Time
         start_time = event["start"].strftime("%A, %B %d, %Y at %H:%M")
@@ -431,9 +433,9 @@ class WeeklyView:
                     """Colorize keyboard shortcuts in brackets with magenta."""
                     # Match content inside brackets and colorize it
                     return re.sub(
-                        r'(\[[^\]]+\])',
+                        r"(\[[^\]]+\])",
                         lambda m: f"{Colors.MAGENTA}{m.group(1)}{Colors.RESET}",
-                        text
+                        text,
                     )
 
                 status_items = [
@@ -452,10 +454,10 @@ class WeeklyView:
                 status_bar = "  ".join(colored_items)
 
                 # Calculate visual length for centering
-                ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
-                visual_len = len(ansi_escape.sub('', status_bar))
+                ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
+                visual_len = len(ansi_escape.sub("", status_bar))
                 padding = (80 - visual_len) // 2
-                centered_bar = ' ' * padding + status_bar
+                centered_bar = " " * padding + status_bar
 
                 print(f"\n{centered_bar}{Colors.RESET}", flush=True)
 
