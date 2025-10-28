@@ -118,48 +118,74 @@ class WeeklyView:
         Args:
             event: Event dictionary to display
         """
-        print(f"\n{Colors.BOLD}{'─'*80}{Colors.RESET}")
-        print(f"{Colors.BOLD}{Colors.CYAN}Event Details:{Colors.RESET}")
-        print(f"{Colors.BOLD}{'─'*80}{Colors.RESET}")
+        import re
+        import textwrap
+
+        width = 76
+
+        def wrap_field(label: str, value: str) -> list[str]:
+            """Wrap a field to fit within the box width."""
+            if not value:
+                return []
+
+            first_line = f"{label} {value}"
+            if len(first_line) <= width:
+                return [first_line]
+
+            # Need to wrap
+            indent = " " * (len(label) + 1)
+            available_width = width - len(label) - 1
+            wrapped = textwrap.wrap(value, width=available_width)
+
+            result = [f"{label} {wrapped[0]}"]
+            for line in wrapped[1:]:
+                result.append(f"{indent}{line}")
+            return result
+
+        lines = []
 
         # Title
-        print(f"{Colors.BOLD}Title:{Colors.RESET} {event['summary']}")
+        lines.extend(wrap_field("Title:", event["summary"]))
 
         # Calendar name
         if event.get("calendar_name"):
-            print(f"{Colors.BOLD}Calendar:{Colors.RESET} {event['calendar_name']}")
+            lines.extend(wrap_field("Calendar:", event["calendar_name"]))
 
         # Time
         start_time = event["start"].strftime("%A, %B %d, %Y at %H:%M")
         end_time = event["end"].strftime("%H:%M")
         if event["start"].date() != event["end"].date():
             end_time = event["end"].strftime("%A, %B %d, %Y at %H:%M")
-        print(f"{Colors.BOLD}Time:{Colors.RESET} {start_time} - {end_time}")
+        lines.extend(wrap_field("Time:", f"{start_time} - {end_time}"))
 
         # Location
         if event.get("location"):
-            print(f"{Colors.BOLD}Location:{Colors.RESET} {event['location']}")
+            lines.extend(wrap_field("Location:", event["location"]))
 
         # Description
         if event.get("description"):
             desc = event["description"].strip()
             if desc:
-                # Strip HTML tags from description
-                import re
-
                 desc = re.sub(r"<[^>]+>", "", desc)
                 desc = desc.strip()
                 if desc:
-                    print(f"{Colors.BOLD}Description:{Colors.RESET}")
-                    # Wrap description text to 76 chars
-                    import textwrap
+                    lines.extend(wrap_field("Description:", desc))
 
-                    wrapped = textwrap.fill(
-                        desc, width=76, initial_indent="  ", subsequent_indent="  "
-                    )
-                    print(wrapped)
+        # Top border - total width is 80 (76 content + 2 spaces + 2 borders)
+        title = " Event Details "
+        border_width = width + 2  # 78 chars between borders
+        padding = (border_width - len(title)) // 2
+        top = f"┌{'─' * padding}{title}{'─' * (border_width - padding - len(title))}┐"
+        print(f"\n{Colors.BOLD}{top}{Colors.RESET}")
 
-        print(f"{Colors.BOLD}{'─'*80}{Colors.RESET}")
+        # Content lines
+        for line in lines:
+            padded = line.ljust(width)
+            print(f"{Colors.BOLD}│{Colors.RESET} {padded} {Colors.BOLD}│{Colors.RESET}")
+
+        # Bottom border
+        bottom = f"└{'─' * border_width}┘"
+        print(f"{Colors.BOLD}{bottom}{Colors.RESET}")
 
     def display(self, selected_event_index: Optional[int] = None) -> None:
         week = self.filter_events_for_week()

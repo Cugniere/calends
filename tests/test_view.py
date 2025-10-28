@@ -175,10 +175,12 @@ class TestEventNavigation:
         view._display_event_details(event)
 
         captured = capsys.readouterr()
-        assert "Event Details:" in captured.out
+        assert "Event Details" in captured.out
         assert "Team Meeting" in captured.out
         assert "Conference Room A" in captured.out
         assert "Weekly team sync" in captured.out
+        assert "┌" in captured.out
+        assert "└" in captured.out
 
     def test_display_event_details_no_location(self, capsys):
         """Test displaying event without location."""
@@ -194,9 +196,11 @@ class TestEventNavigation:
         view._display_event_details(event)
 
         captured = capsys.readouterr()
-        assert "Event Details:" in captured.out
+        assert "Event Details" in captured.out
         assert "Test Event" in captured.out
         assert "Location:" not in captured.out
+        assert "┌" in captured.out
+        assert "└" in captured.out
 
     def test_display_with_selection(self, capsys):
         """Test that display shows selection marker."""
@@ -266,3 +270,25 @@ class TestEventNavigation:
         assert "Some link and bold text" in captured.out
         assert "<a href" not in captured.out
         assert "<b>" not in captured.out
+
+    def test_display_event_details_wraps_long_lines(self, capsys):
+        """Test that long lines are wrapped properly within the box."""
+        import re
+        event = {
+            "start": datetime(2025, 11, 2, 0, 0, 0, tzinfo=timezone.utc),
+            "end": datetime(2025, 11, 3, 0, 0, 0, tzinfo=timezone.utc),
+            "summary": "Long date event",
+            "location": "",
+            "description": "",
+            "calendar_name": "Shared",
+        }
+        view = WeeklyView([], target_timezone=timezone.utc)
+
+        view._display_event_details(event)
+
+        captured = capsys.readouterr()
+        lines = captured.out.split('\n')
+        ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
+        for line in lines:
+            clean_line = ansi_escape.sub('', line)
+            assert len(clean_line) <= 80, f"Line exceeds 80 chars: {clean_line}"
