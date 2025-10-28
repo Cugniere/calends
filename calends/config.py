@@ -6,22 +6,76 @@ import json
 import re
 from datetime import timedelta, timezone
 from typing import Optional
+from pathlib import Path
 from .constants import DEFAULT_CONFIG_FILES, DEFAULT_CACHE_EXPIRATION_CONFIG
 
 
 def find_default_config() -> Optional[str]:
     """
-    Find a default configuration file in the current directory.
+    Find a default configuration file in multiple locations.
 
-    Searches for configuration files in priority order.
+    Searches for configuration files in priority order:
+    1. Current directory: ./calendars.json, ./calends.json
+    2. User home directory: ~/.calends.json
+    3. User config directory:
+       - Linux/macOS: ~/.config/calends/config.json
+       - macOS: ~/Library/Application Support/calends/config.json
+       - Windows: %APPDATA%/calends/config.json
 
     Returns:
         Path to the first found config file, or None if none found
     """
+    # 1. Check current directory first (backward compatibility)
     for name in DEFAULT_CONFIG_FILES:
         if os.path.isfile(name):
             return name
+
+    # 2. Check user home directory
+    home = Path.home()
+    home_config = home / ".calends.json"
+    if home_config.is_file():
+        return str(home_config)
+
+    # 3. Check platform-specific config directory
+    config_dir = _get_config_directory()
+    if config_dir:
+        config_file = config_dir / "config.json"
+        if config_file.is_file():
+            return str(config_file)
+
     return None
+
+
+def _get_config_directory() -> Optional[Path]:
+    """
+    Get the platform-specific configuration directory for calends.
+
+    Returns:
+        Path to config directory, or None if it cannot be determined
+    """
+    home = Path.home()
+
+    # Check XDG_CONFIG_HOME first (Linux/Unix standard)
+    xdg_config = os.environ.get("XDG_CONFIG_HOME")
+    if xdg_config:
+        return Path(xdg_config) / "calends"
+
+    # Platform-specific defaults
+    if sys.platform == "darwin":
+        # macOS: prefer XDG, fallback to Application Support
+        xdg_default = home / ".config" / "calends"
+        if xdg_default.exists():
+            return xdg_default
+        return home / "Library" / "Application Support" / "calends"
+    elif sys.platform == "win32":
+        # Windows: use APPDATA
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            return Path(appdata) / "calends"
+        return home / "AppData" / "Roaming" / "calends"
+    else:
+        # Linux and other Unix-like systems
+        return home / ".config" / "calends"
 
 
 def parse_timezone(tz_string: Optional[str]) -> Optional[timezone]:

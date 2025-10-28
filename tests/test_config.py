@@ -143,6 +143,82 @@ class TestFindDefaultConfig:
 
         assert result is None
 
+    def test_find_home_config(self, tmp_path, monkeypatch):
+        """Test finding config in home directory."""
+        monkeypatch.chdir(tmp_path)
+        # Mock home directory
+        home_dir = tmp_path / "home"
+        home_dir.mkdir()
+        monkeypatch.setattr(Path, "home", lambda: home_dir)
+
+        # Create config in home directory
+        home_config = home_dir / ".calends.json"
+        home_config.write_text('{"calendars": []}')
+
+        result = find_default_config()
+
+        assert result == str(home_config)
+
+    def test_find_config_directory(self, tmp_path, monkeypatch):
+        """Test finding config in user config directory."""
+        monkeypatch.chdir(tmp_path)
+        # Mock home directory
+        home_dir = tmp_path / "home"
+        home_dir.mkdir()
+        monkeypatch.setattr(Path, "home", lambda: home_dir)
+
+        # Create config in config directory
+        config_dir = home_dir / ".config" / "calends"
+        config_dir.mkdir(parents=True)
+        config_file = config_dir / "config.json"
+        config_file.write_text('{"calendars": []}')
+
+        result = find_default_config()
+
+        assert result == str(config_file)
+
+    def test_current_dir_priority(self, tmp_path, monkeypatch):
+        """Test that current directory has priority over home."""
+        monkeypatch.chdir(tmp_path)
+        # Mock home directory
+        home_dir = tmp_path / "home"
+        home_dir.mkdir()
+        monkeypatch.setattr(Path, "home", lambda: home_dir)
+
+        # Create config in both locations
+        current_config = tmp_path / "calendars.json"
+        current_config.write_text('{"calendars": ["current"]}')
+
+        home_config = home_dir / ".calends.json"
+        home_config.write_text('{"calendars": ["home"]}')
+
+        result = find_default_config()
+
+        # Current directory should win
+        assert result == "calendars.json"
+
+    def test_home_priority_over_config_dir(self, tmp_path, monkeypatch):
+        """Test that home directory has priority over config directory."""
+        monkeypatch.chdir(tmp_path)
+        # Mock home directory
+        home_dir = tmp_path / "home"
+        home_dir.mkdir()
+        monkeypatch.setattr(Path, "home", lambda: home_dir)
+
+        # Create config in both locations
+        home_config = home_dir / ".calends.json"
+        home_config.write_text('{"calendars": ["home"]}')
+
+        config_dir = home_dir / ".config" / "calends"
+        config_dir.mkdir(parents=True)
+        config_file = config_dir / "config.json"
+        config_file.write_text('{"calendars": ["config_dir"]}')
+
+        result = find_default_config()
+
+        # Home directory should win
+        assert result == str(home_config)
+
     def test_calendars_priority_over_calends(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         calendars = tmp_path / "calendars.json"

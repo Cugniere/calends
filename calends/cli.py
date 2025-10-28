@@ -33,7 +33,7 @@ Config file format (calendars.json or calends.json):
     "cache_expiration": 3600
   }
 
-For more information, visit: https://github.com/anthropics/claude-code
+For more information, visit: https://github.com/cugniere/calends
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

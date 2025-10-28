@@ -79,7 +79,16 @@ The event details panel shows:
 
 ## Configuration
 
-Create `calendars.json` or `calends.json` in your current directory. The config file is auto-detected.
+Calends automatically searches for configuration files in the following locations (in priority order):
+
+1. **Current directory**: `./calendars.json` or `./calends.json`
+2. **User home directory**: `~/.calends.json`
+3. **User config directory**:
+   - Linux/macOS: `~/.config/calends/config.json`
+   - macOS (alternative): `~/Library/Application Support/calends/config.json`
+   - Windows: `%APPDATA%\calends\config.json`
+
+You can also specify a config file explicitly with `-c/--config path/to/config.json`.
 
 ### Format
 
@@ -101,6 +110,34 @@ Create `calendars.json` or `calends.json` in your current directory. The config 
 - `timezone`: UTC, LOCAL, or offset like +05:30 (default: LOCAL)
 - `cache_expiration`: Cache duration in seconds (default: 3600)
 - `auto_refresh_interval`: Auto-refresh interval in seconds for interactive mode (default: 300, set to 0 to disable)
+
+**Example Setup:**
+
+```bash
+# Create config in user config directory (Linux/macOS)
+mkdir -p ~/.config/calends
+cat > ~/.config/calends/config.json << 'EOF'
+{
+  "calendars": {
+    "Work": "https://calendar.google.com/calendar/ical/.../basic.ics",
+    "Personal": "~/Documents/personal.ics"
+  },
+  "timezone": "LOCAL"
+}
+EOF
+
+# Or create in home directory
+cat > ~/.calends.json << 'EOF'
+{
+  "calendars": {
+    "Work": "https://example.com/work.ics"
+  }
+}
+EOF
+
+# Then simply run calends from anywhere
+calends
+```
 
 ## Options
 
