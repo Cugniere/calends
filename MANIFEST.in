@@ -1,0 +1,12 @@
+include README.md
+include LICENSE
+include requirements.dev.txt
+recursive-include calends *.py
+recursive-exclude tests *
+recursive-exclude .pytest_cache *
+recursive-exclude .git *
+recursive-exclude .venv *
+recursive-exclude __pycache__ *
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude .DS_Store

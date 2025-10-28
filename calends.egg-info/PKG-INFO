@@ -1,3 +1,37 @@
+Metadata-Version: 2.4
+Name: calends
+Version: 0.1.0
+Summary: A minimalist terminal calendar that displays your iCal events in a clean weekly view
+Home-page: https://github.com/cugniere/calends
+Author: Cugniere
+License: MIT
+Project-URL: Homepage, https://github.com/cugniere/calends
+Project-URL: Repository, https://github.com/cugniere/calends
+Project-URL: Issues, https://github.com/cugniere/calends/issues
+Keywords: calendar,ical,terminal,cli,ics
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Console
+Classifier: Intended Audience :: End Users/Desktop
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Topic :: Office/Business :: Scheduling
+Classifier: Topic :: Utilities
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Provides-Extra: dev
+Requires-Dist: black>=25.9.0; extra == "dev"
+Requires-Dist: pytest>=8.4.2; extra == "dev"
+Dynamic: author
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: requires-python
+
 # Calends
 
 A minimalist terminal calendar that displays your iCal events in a clean weekly view with support for recurring events, timezones, and remote calendars.
@@ -6,24 +40,8 @@ A minimalist terminal calendar that displays your iCal events in a clean weekly 
 
 ## Installation
 
-### From Source (Development)
-
 ```bash
-# Clone the repository
-git clone https://github.com/cugniere/calends.git
-cd calends
-
-# Install in development mode
 pip install -e .
-
-# Or install with development dependencies
-pip install -e ".[dev]"
-```
-
-### From PyPI (Coming Soon)
-
-```bash
-pip install calends
 ```
 
 ## Quick Start
@@ -151,20 +169,13 @@ Create `calendars.json` or `calends.json` in your current directory. The config 
 
 ## Testing
 
-Install with development dependencies:
+Install developer dependencies by running:
 
 ```bash
-pip install -e ".[dev]"
+pip install requirements.dev.txt
 ```
 
-Then run the tests:
-
+Then run the tests with the command:
 ```bash
 pytest
-```
-
-Run tests with coverage:
-
-```bash
-pytest --cov=calends --cov-report=html
 ```
