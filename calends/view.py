@@ -128,16 +128,19 @@ class WeeklyView:
             if not value:
                 return []
 
+            # Colorize the label
+            colored_label = f"{Colors.GREEN}{label}{Colors.RESET}"
+
             first_line = f"{label} {value}"
             if len(first_line) <= width:
-                return [first_line]
+                return [f"{colored_label} {value}"]
 
             # Need to wrap
             indent = " " * (len(label) + 1)
             available_width = width - len(label) - 1
             wrapped = textwrap.wrap(value, width=available_width)
 
-            result = [f"{label} {wrapped[0]}"]
+            result = [f"{colored_label} {wrapped[0]}"]
             for line in wrapped[1:]:
                 result.append(f"{indent}{line}")
             return result
@@ -184,8 +187,12 @@ class WeeklyView:
         print(f"\n{Colors.BOLD}{top}{Colors.RESET}")
 
         # Content lines
+        ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
         for line in lines:
-            padded = line.ljust(width)
+            # Calculate visual length without ANSI codes
+            visual_len = len(ansi_escape.sub("", line))
+            padding_needed = width - visual_len
+            padded = line + (" " * padding_needed)
             print(f"{Colors.BOLD}│{Colors.RESET} {padded} {Colors.BOLD}│{Colors.RESET}")
 
         # Bottom border
