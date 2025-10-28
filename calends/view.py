@@ -122,22 +122,24 @@ class WeeklyView:
         import textwrap
 
         width = 76
+        max_label_width = 12  # Length of "Description:"
 
-        def wrap_field(label: str, value: str) -> list[str]:
+        def wrap_field(label: str, value: str, max_label_width: int) -> list[str]:
             """Wrap a field to fit within the box width."""
             if not value:
                 return []
 
-            # Colorize the label
-            colored_label = f"{Colors.GREEN}{label}{Colors.RESET}"
+            # Pad label to max width for alignment
+            padded_label = label.ljust(max_label_width)
+            colored_label = f"{Colors.GREEN}{padded_label}{Colors.RESET}"
 
-            first_line = f"{label} {value}"
+            first_line = f"{padded_label} {value}"
             if len(first_line) <= width:
                 return [f"{colored_label} {value}"]
 
             # Need to wrap
-            indent = " " * (len(label) + 1)
-            available_width = width - len(label) - 1
+            indent = " " * (max_label_width + 1)
+            available_width = width - max_label_width - 1
             wrapped = textwrap.wrap(value, width=available_width)
 
             result = [f"{colored_label} {wrapped[0]}"]
@@ -148,27 +150,27 @@ class WeeklyView:
         lines = []
 
         # Title
-        lines.extend(wrap_field("Title:", event["summary"]))
+        lines.extend(wrap_field("Title:", event["summary"], max_label_width))
 
         # Calendar name
         if event.get("calendar_name"):
-            lines.extend(wrap_field("Calendar:", event["calendar_name"]))
+            lines.extend(wrap_field("Calendar:", event["calendar_name"], max_label_width))
 
         # Time
         start_time = event["start"].strftime("%A, %B %d, %Y at %H:%M")
         end_time = event["end"].strftime("%H:%M")
         if event["start"].date() != event["end"].date():
             end_time = event["end"].strftime("%A, %B %d, %Y at %H:%M")
-        lines.extend(wrap_field("Time:", f"{start_time} - {end_time}"))
+        lines.extend(wrap_field("Time:", f"{start_time} - {end_time}", max_label_width))
 
         # Location
         if event.get("location"):
-            lines.extend(wrap_field("Location:", event["location"]))
+            lines.extend(wrap_field("Location:", event["location"], max_label_width))
 
         # Attendees
         if event.get("attendees") and len(event["attendees"]) > 0:
             attendees_str = ", ".join(event["attendees"])
-            lines.extend(wrap_field("Attendees:", attendees_str))
+            lines.extend(wrap_field("Attendees:", attendees_str, max_label_width))
 
         # Description
         if event.get("description"):
@@ -177,7 +179,7 @@ class WeeklyView:
                 desc = re.sub(r"<[^>]+>", "", desc)
                 desc = desc.strip()
                 if desc:
-                    lines.extend(wrap_field("Description:", desc))
+                    lines.extend(wrap_field("Description:", desc, max_label_width))
 
         # Top border - total width is 80 (76 content + 2 spaces + 2 borders)
         title = " Event Details "
@@ -226,9 +228,9 @@ class WeeklyView:
             key = current.date()
             is_today = key == now.date()
             is_past = key < now.date()
-            day_color = Colors.DIM if is_past else Colors.WHITE
-            header = f"{Colors.GREEN if is_today else day_color}{dname}, {current.strftime('%b %d')}{Colors.RESET}"
-            print(f"\n{Colors.BOLD}{header}{Colors.RESET}")
+            day_color = Colors.DIM if is_past else Colors.YELLOW
+            header = f"{Colors.YELLOW if is_today else day_color}{dname}, {current.strftime('%b %d')}{Colors.RESET}"
+            print(f"\n{header}{Colors.RESET}")
             print(f"{Colors.DIM}{'─'*80}{Colors.RESET}")
             if key in week:
                 for e in week[key]:
@@ -263,18 +265,18 @@ class WeeklyView:
                         print(
                             f"{Colors.DIM}{selection_marker}{time_range:<15}{Colors.RESET}{e['summary']}{Colors.RESET}"
                         )
-                        if e["location"]:
-                            print(
-                                f"{Colors.CYAN}                   ⚲ {self.truncate(e['location'],60)}{Colors.RESET}"
-                            )
+                    elif time_range == "All day":
+                        print(
+                            f"{Colors.GREEN}{selection_marker}{time_range:<15}{Colors.RESET}{e['summary']}{Colors.RESET}"
+                        )
                     else:
                         print(
-                            f"{Colors.BLUE}{selection_marker}{time_range:<15}{Colors.RESET}{e['summary']}{Colors.RESET}"
+                            f"{Colors.CYAN}{selection_marker}{time_range:<15}{Colors.RESET}{e['summary']}{Colors.RESET}"
                         )
-                        if e["location"]:
-                            print(
-                                f"{Colors.CYAN}                   ⚲ {self.truncate(e['location'],60)}{Colors.RESET}"
-                            )
+                    if e["location"]:
+                        print(
+                            f"{Colors.CYAN}                   ⚲ {self.truncate(e['location'],60)}{Colors.RESET}"
+                        )
 
                     event_counter += 1
             else:
@@ -423,6 +425,17 @@ class WeeklyView:
                 self.display(self._selected_event_index if total_events > 0 else None)
 
                 # Build status bar based on available features
+                import re
+
+                def colorize_shortcuts(text: str) -> str:
+                    """Colorize keyboard shortcuts in brackets with magenta."""
+                    # Match content inside brackets and colorize it
+                    return re.sub(
+                        r'(\[[^\]]+\])',
+                        lambda m: f"{Colors.MAGENTA}{m.group(1)}{Colors.RESET}",
+                        text
+                    )
+
                 status_items = [
                     "[↑↓]select",
                     "[n]ext",
@@ -433,9 +446,18 @@ class WeeklyView:
                 if self.refresh_callback:
                     status_items.append("[r]efresh")
                 status_items.extend(["[h]elp", "[q]uit"])
-                status_bar = "  ".join(status_items)
-                centered_bar = status_bar.center(80)
-                print(f"\n{Colors.DIM}{centered_bar}{Colors.RESET}", flush=True)
+
+                # Colorize the shortcuts
+                colored_items = [colorize_shortcuts(item) for item in status_items]
+                status_bar = "  ".join(colored_items)
+
+                # Calculate visual length for centering
+                ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
+                visual_len = len(ansi_escape.sub('', status_bar))
+                padding = (80 - visual_len) // 2
+                centered_bar = ' ' * padding + status_bar
+
+                print(f"\n{centered_bar}{Colors.RESET}", flush=True)
 
                 # Display selected event details
                 if total_events > 0 and 0 <= self._selected_event_index < total_events:
